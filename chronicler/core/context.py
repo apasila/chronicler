@@ -29,7 +29,7 @@ class ContextAssembler:
 
         if active is not None:
             elapsed_minutes = (now - active.started_at).total_seconds() / 60
-            if elapsed_minutes < session_gap_minutes * 10:
+            if elapsed_minutes < session_gap_minutes:
                 return active
             # Close expired session
             active.ended_at = now

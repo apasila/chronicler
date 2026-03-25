@@ -104,8 +104,10 @@ def init(
     MapManager(str(chronicler_dir)).create_initial(project_name, framework, [])
 
     gitignore = project_path / ".gitignore"
-    if gitignore.exists() and ".chronicler/" not in gitignore.read_text():
-        gitignore.write_text(gitignore.read_text() + "\n.chronicler/\n")
+    if gitignore.exists():
+        content = gitignore.read_text()
+        if ".chronicler/" not in content:
+            gitignore.write_text(content + "\n.chronicler/\n")
 
     console.print("\n" + "─" * 40)
     console.print("✓ .chronicler/config.toml created")
@@ -316,12 +318,17 @@ def _run_watcher(project, config, db) -> None:
 
 
 def _daemonize(project_path: Path, project, config, db) -> None:
-    import multiprocessing
+    import subprocess as _subprocess
     pid_file = project_path / ".chronicler" / "chronicler.pid"
-    p = multiprocessing.Process(target=_run_watcher, args=(project, config, db), daemon=True)
-    p.start()
-    pid_file.write_text(str(p.pid))
-    console.print(f"Daemon started (PID {p.pid}). Run [bold]chronicler stop[/bold] to stop.")
+    # Launch a detached foreground watcher that survives the parent
+    proc = _subprocess.Popen(
+        ["chronicler", "start", "--foreground", "--path", str(project_path)],
+        start_new_session=True,
+        stdout=_subprocess.DEVNULL,
+        stderr=_subprocess.DEVNULL,
+    )
+    pid_file.write_text(str(proc.pid))
+    console.print(f"Daemon started (PID {proc.pid}). Run [bold]chronicler stop[/bold] to stop.")
 
 
 if __name__ == "__main__":

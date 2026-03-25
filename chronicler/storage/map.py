@@ -65,6 +65,8 @@ class MapManager:
         section_map = {
             "dependencies": "## Dependencies (recent changes)",
             "known_issues": "## Known Issues",
+            "routes": "## Active Routes",
+            "features": "## Feature Status",
         }
         content = "\n".join(lines)
         for key, header in section_map.items():

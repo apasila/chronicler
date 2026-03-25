@@ -18,7 +18,7 @@ class LLMClient:
         self.config = config
         if config.groq.api_key:
             import os
-            os.environ.setdefault("GROQ_API_KEY", config.groq.api_key)
+            os.environ["GROQ_API_KEY"] = config.groq.api_key
 
     def complete(
         self,
