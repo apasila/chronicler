@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chronicler"
+version = "0.1.0"
+description = "Background daemon that logs code changes with LLM analysis for AI agent handoffs"
+requires-python = ">=3.11"
+dependencies = [
+    "watchdog>=4.0",
+    "litellm>=1.30",
+    "typer>=0.12",
+    "pydantic>=2.6",
+    "toml>=0.10",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-mock>=3.12"]
+
+[project.scripts]
+chronicler = "chronicler.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["chronicler*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
