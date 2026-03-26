@@ -276,6 +276,56 @@ class Database:
         """, (project_id, limit)).fetchall()
         return [self._row_to_entry(r) for r in rows]
 
+    def get_all_recent_entries(
+        self,
+        limit: int = 50,
+        project_id: str | None = None,
+        change_type: str | None = None,
+        after_rowid: int | None = None,
+    ) -> list[dict]:
+        """Fetch recent entries across all projects as plain dicts.
+        Uses SQLite rowid (monotonic int) for SSE cursor support.
+        """
+        query = """
+            SELECT le.rowid, le.id, le.project_id, p.name AS project_name,
+                   le.session_id, le.timestamp, le.file_relative_path,
+                   le.change_type, le.change_summary, le.change_impact,
+                   le.change_diff_snapshot
+            FROM log_entries le
+            JOIN projects p ON le.project_id = p.id
+            WHERE 1=1
+        """
+        params: list = []
+        if project_id is not None:
+            query += " AND le.project_id = ?"
+            params.append(project_id)
+        if change_type is not None:
+            query += " AND le.change_type = ?"
+            params.append(change_type)
+        if after_rowid is not None:
+            query += " AND le.rowid > ?"
+            params.append(after_rowid)
+        query += " ORDER BY le.rowid DESC LIMIT ?"
+        params.append(limit)
+
+        rows = self._get_conn().execute(query, params).fetchall()
+        return [
+            {
+                "rowid": row["rowid"],
+                "id": row["id"],
+                "project_id": row["project_id"],
+                "project_name": row["project_name"],
+                "session_id": row["session_id"],
+                "timestamp": row["timestamp"],
+                "file_relative_path": row["file_relative_path"],
+                "change_type": row["change_type"],
+                "change_summary": row["change_summary"],
+                "change_impact": row["change_impact"],
+                "change_diff_snapshot": row["change_diff_snapshot"],
+            }
+            for row in rows
+        ]
+
     def _row_to_entry(self, row: sqlite3.Row) -> LogEntry:
         return LogEntry(
             id=row["id"], project_id=row["project_id"], session_id=row["session_id"],

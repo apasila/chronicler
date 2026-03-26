@@ -42,3 +42,58 @@ def test_get_project_by_path(tmp_db, sample_project):
     found = tmp_db.get_project_by_path("/tmp/test-project")
     assert found is not None
     assert found.id == "proj-1"
+
+
+def test_get_all_recent_entries_empty(tmp_db):
+    results = tmp_db.get_all_recent_entries()
+    assert results == []
+
+
+def test_get_all_recent_entries_returns_dicts(tmp_db, sample_project, sample_session):
+    from tests.conftest import make_entry
+    tmp_db.insert_project(sample_project)
+    tmp_db.insert_session(sample_session)
+    tmp_db.insert_log_entry(make_entry(sample_project.id, sample_session.id, change_type="feature"))
+    tmp_db.insert_log_entry(make_entry(sample_project.id, sample_session.id, change_type="bug_fix"))
+    results = tmp_db.get_all_recent_entries(limit=10)
+    assert len(results) == 2
+    required = {"rowid", "id", "project_id", "project_name", "change_type",
+                "change_summary", "file_relative_path", "change_impact",
+                "timestamp", "session_id", "change_diff_snapshot"}
+    for entry in results:
+        assert required.issubset(entry.keys())
+
+
+def test_get_all_recent_entries_filter_by_project(tmp_db, sample_project, sample_session):
+    from tests.conftest import make_entry
+    tmp_db.insert_project(sample_project)
+    tmp_db.insert_session(sample_session)
+    tmp_db.insert_log_entry(make_entry(sample_project.id, sample_session.id))
+    results = tmp_db.get_all_recent_entries(project_id=sample_project.id)
+    assert len(results) == 1
+    assert tmp_db.get_all_recent_entries(project_id="nonexistent-id") == []
+
+
+def test_get_all_recent_entries_filter_by_change_type(tmp_db, sample_project, sample_session):
+    from tests.conftest import make_entry
+    tmp_db.insert_project(sample_project)
+    tmp_db.insert_session(sample_session)
+    tmp_db.insert_log_entry(make_entry(sample_project.id, sample_session.id, change_type="feature"))
+    tmp_db.insert_log_entry(make_entry(sample_project.id, sample_session.id, change_type="bug_fix"))
+    results = tmp_db.get_all_recent_entries(change_type="feature")
+    assert len(results) == 1
+    assert results[0]["change_type"] == "feature"
+
+
+def test_get_all_recent_entries_after_rowid(tmp_db, sample_project, sample_session):
+    from tests.conftest import make_entry
+    tmp_db.insert_project(sample_project)
+    tmp_db.insert_session(sample_session)
+    tmp_db.insert_log_entry(make_entry(sample_project.id, sample_session.id))
+    tmp_db.insert_log_entry(make_entry(sample_project.id, sample_session.id))
+    all_entries = tmp_db.get_all_recent_entries()
+    assert len(all_entries) == 2
+    min_rowid = min(e["rowid"] for e in all_entries)
+    results = tmp_db.get_all_recent_entries(after_rowid=min_rowid)
+    assert len(results) == 1
+    assert results[0]["rowid"] > min_rowid
