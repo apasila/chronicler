@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from datetime import datetime
 from chronicler.storage.db import Database
 from chronicler.storage.schema import (
@@ -47,4 +48,27 @@ def sample_entry():
         llm=LLMInfo(model="test-model", tokens_used=500, prompt_version="1.0", processing_ms=200),
         context={"git_branch": "main"}, tags=["feature"],
         manually_edited=False, notes=None,
+    )
+
+
+def make_entry(project_id: str, session_id: str, change_type: str = "feature") -> LogEntry:
+    return LogEntry(
+        id=str(uuid.uuid4()),
+        project_id=project_id,
+        session_id=session_id,
+        timestamp=datetime.utcnow(),
+        file=FileInfo(
+            path="/tmp/foo.py", relative_path="foo.py",
+            extension=".py", language="python",
+            is_new=False, is_deleted=False, is_renamed=False, renamed_from=None,
+        ),
+        change=ChangeInfo(
+            type=change_type, subtype=None, confidence=0.9,
+            summary="Test change", impact="low",
+            lines_added=1, lines_removed=0,
+            diff_snapshot="+x = 1",
+            affected_functions=None, affected_components=None,
+        ),
+        llm=LLMInfo(model="test", tokens_used=10, prompt_version="1.0", processing_ms=100),
+        context={}, tags=[], manually_edited=False, notes=None,
     )
