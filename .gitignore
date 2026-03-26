@@ -8,3 +8,4 @@ build/
 .chronicler/
 *.db
 .pytest_cache/
+.superpowers/
