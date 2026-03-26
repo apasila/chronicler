@@ -15,6 +15,8 @@ from chronicler.core.daemon import get_daemon_status, start_daemon, stop_daemon
 from chronicler.storage.schema import Project
 from chronicler.storage.map import MapManager
 from chronicler.cli.main import _detect_framework
+from chronicler.config.settings import load_config
+from chronicler.llm.classifier import HandoffGenerator
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -159,6 +161,58 @@ def create_app(db: Database | None = None) -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @app.get("/api/projects/{project_id}/map")
+    def get_map(project_id: str):
+        project = db.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        map_path = Path(project.path) / ".chronicler" / "CHRONICLER_MAP.md"
+        if not map_path.exists():
+            raise HTTPException(status_code=404, detail="Map not found — project may not have activity yet")
+        return {"markdown": map_path.read_text()}
+
+    @app.post("/api/projects/{project_id}/handoff")
+    def generate_handoff(project_id: str):
+        project = db.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project_path = Path(project.path)
+        try:
+            config = load_config(str(project_path))
+            map_mgr = MapManager(str(project_path / ".chronicler"))
+            output = HandoffGenerator(config).generate(project, map_mgr.read(), db, 5)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Handoff generation failed: {e}")
+
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+        out_path = project_path / ".chronicler" / "handoffs" / f"{date_str}-handoff.md"
+        out_path.parent.mkdir(exist_ok=True)
+        out_path.write_text(output)
+        return {"markdown": output, "saved_to": str(out_path)}
+
+    @app.get("/api/config/groq-key-status")
+    def groq_key_status():
+        detected = bool(os.environ.get("GROQ_API_KEY"))
+        return {"detected": detected}
+
+    class GroqKeyRequest(BaseModel):
+        key: str
+
+    @app.post("/api/config/groq-key")
+    def set_groq_key(req: GroqKeyRequest):
+        global_config_path = Path.home() / ".config" / "chronicler" / "config.toml"
+        os.environ["GROQ_API_KEY"] = req.key
+        if global_config_path.exists():
+            config_data = toml.loads(global_config_path.read_text())
+        else:
+            config_data = {}
+        if "groq" not in config_data:
+            config_data["groq"] = {}
+        config_data["groq"]["api_key"] = req.key
+        global_config_path.parent.mkdir(parents=True, exist_ok=True)
+        global_config_path.write_text(toml.dumps(config_data))
+        return {"ok": True}
 
     @app.get("/")
     def root():

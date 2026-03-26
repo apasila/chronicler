@@ -193,3 +193,39 @@ def test_get_activity_filter_by_change_type(tmp_path):
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["change_type"] == "feature"
+
+
+def test_get_map_not_found(tmp_path):
+    import uuid
+    from datetime import datetime
+    from chronicler.storage.schema import Project
+    from chronicler.storage.db import Database
+    db2 = Database(str(tmp_path / "db2.db"))
+    db2.initialize()
+    proj_path = tmp_path / "mapapp"
+    proj_path.mkdir()
+    project = Project(
+        id=str(uuid.uuid4()), name="mapapp", path=str(proj_path),
+        created_at=datetime.utcnow(), git_enabled=False, primary_language="python",
+        languages=[], framework=None, description=None, log_mode="debounced",
+        ignore_patterns=[], tags=[],
+    )
+    db2.insert_project(project)
+    app = create_app(db2)
+    c = TestClient(app)
+    response = c.get(f"/api/projects/{project.id}/map")
+    assert response.status_code == 404
+
+
+def test_groq_key_status_detected(client, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-123")
+    response = client.get("/api/config/groq-key-status")
+    assert response.status_code == 200
+    assert response.json()["detected"] is True
+
+
+def test_groq_key_status_not_detected(client, monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    response = client.get("/api/config/groq-key-status")
+    assert response.status_code == 200
+    assert response.json()["detected"] is False
