@@ -229,3 +229,11 @@ def test_groq_key_status_not_detected(client, monkeypatch):
     response = client.get("/api/config/groq-key-status")
     assert response.status_code == 200
     assert response.json()["detected"] is False
+
+
+def test_ui_app_is_importable():
+    """Smoke test: create_app() returns a FastAPI instance without error."""
+    from chronicler.ui.server import create_app
+    from fastapi import FastAPI
+    app = create_app()
+    assert isinstance(app, FastAPI)

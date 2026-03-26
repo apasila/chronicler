@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import uuid
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -246,6 +247,34 @@ def view_map(path: str = typer.Option(".", help="Project path")):
         console.print("[yellow]No map found. Run: chronicler init[/yellow]")
     else:
         console.print(content)
+
+
+@app.command()
+def ui(
+    port: int = typer.Option(8765, help="Port to serve the UI on"),
+    no_open: bool = typer.Option(False, "--no-open", help="Don't open browser automatically"),
+):
+    """Launch the Chronicler web dashboard."""
+    import socket
+    # Check if port is available
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(("localhost", port)) == 0:
+            console.print(f"[red]Port {port} is already in use.[/red]")
+            console.print(f"Try: [bold]chronicler ui --port {port + 1}[/bold]")
+            raise typer.Exit(1)
+
+    import uvicorn
+    from chronicler.ui.server import create_app
+
+    url = f"http://localhost:{port}"
+    console.print(f"[bold]Chronicler UI[/bold] → {url}")
+    console.print("Press [bold]Ctrl+C[/bold] to stop.\n")
+
+    if not no_open:
+        webbrowser.open(url)
+
+    app_instance = create_app()
+    uvicorn.run(app_instance, host="127.0.0.1", port=port, log_level="warning")
 
 
 def _run_watcher(project, config, db) -> None:
