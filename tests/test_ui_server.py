@@ -50,3 +50,60 @@ def test_root_serves_html(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
+
+
+def test_detect_framework_nextjs(client, tmp_path):
+    proj = tmp_path / "myapp"
+    proj.mkdir()
+    (proj / "next.config.js").touch()
+    response = client.get(f"/api/detect-framework?path={proj}")
+    assert response.status_code == 200
+    assert response.json()["framework"] == "nextjs"
+
+
+def test_detect_framework_unknown(client, tmp_path):
+    proj = tmp_path / "emptyapp"
+    proj.mkdir()
+    response = client.get(f"/api/detect-framework?path={proj}")
+    assert response.status_code == 200
+    assert response.json()["framework"] == ""
+
+
+def test_add_project(client, tmp_path):
+    proj = tmp_path / "newapp"
+    proj.mkdir()
+    (proj / "next.config.js").touch()
+    response = client.post("/api/projects", json={"path": str(proj), "name": "newapp"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "newapp"
+    assert data["framework"] == "nextjs"
+    assert "id" in data
+    # .chronicler dir should be created
+    assert (proj / ".chronicler").exists()
+    assert (proj / ".chronicler" / "config.toml").exists()
+
+
+def test_add_project_invalid_path(client, tmp_path):
+    response = client.post("/api/projects", json={"path": "/does/not/exist", "name": "x"})
+    assert response.status_code == 400
+
+
+def test_start_stop_project(client, tmp_path):
+    from unittest.mock import patch
+    proj = tmp_path / "startapp"
+    proj.mkdir()
+    # Add project first
+    client.post("/api/projects", json={"path": str(proj), "name": "startapp"})
+    projects = client.get("/api/projects").json()
+    project_id = next(p["id"] for p in projects if p["name"] == "startapp")
+
+    with patch("chronicler.ui.server.start_daemon") as mock_start:
+        response = client.post(f"/api/projects/{project_id}/start")
+        assert response.status_code == 200
+        mock_start.assert_called_once()
+
+    with patch("chronicler.ui.server.stop_daemon") as mock_stop:
+        response = client.post(f"/api/projects/{project_id}/stop")
+        assert response.status_code == 200
+        mock_stop.assert_called_once()
