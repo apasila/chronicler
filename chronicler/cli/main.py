@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from chronicler.config.settings import load_config
+from chronicler.core.daemon import start_daemon, stop_daemon, get_daemon_status
 from chronicler.storage.db import Database
 from chronicler.storage.map import MapManager
 from chronicler.storage.schema import Project
@@ -142,19 +143,15 @@ def start(
 @app.command()
 def stop(path: str = typer.Option(".", help="Project path")):
     """Stop the daemon."""
-    import signal
-    pid_file = Path(path).resolve() / ".chronicler" / "chronicler.pid"
-    if not pid_file.exists():
+    project_path = Path(path).resolve()
+    status = get_daemon_status(project_path)
+    if status == "stopped":
         console.print("No daemon running.")
         return
+    pid_file = project_path / ".chronicler" / "chronicler.pid"
     pid = int(pid_file.read_text().strip())
-    try:
-        os.kill(pid, signal.SIGTERM)
-        pid_file.unlink()
-        console.print(f"Stopped daemon (PID {pid})")
-    except ProcessLookupError:
-        pid_file.unlink()
-        console.print("Daemon was not running (stale PID cleaned up)")
+    stop_daemon(project_path)
+    console.print(f"Stopped daemon (PID {pid})")
 
 
 @app.command()
@@ -318,17 +315,8 @@ def _run_watcher(project, config, db) -> None:
 
 
 def _daemonize(project_path: Path, project, config, db) -> None:
-    import subprocess as _subprocess
-    pid_file = project_path / ".chronicler" / "chronicler.pid"
-    # Launch a detached foreground watcher that survives the parent
-    proc = _subprocess.Popen(
-        ["chronicler", "start", "--foreground", "--path", str(project_path)],
-        start_new_session=True,
-        stdout=_subprocess.DEVNULL,
-        stderr=_subprocess.DEVNULL,
-    )
-    pid_file.write_text(str(proc.pid))
-    console.print(f"Daemon started (PID {proc.pid}). Run [bold]chronicler stop[/bold] to stop.")
+    start_daemon(project_path)
+    console.print(f"Daemon started. Run [bold]chronicler stop[/bold] to stop.")
 
 
 if __name__ == "__main__":
