@@ -1,11 +1,13 @@
 from __future__ import annotations
+import asyncio
+import json
 import os
 import uuid
 import toml
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from chronicler.storage.db import Database
@@ -116,6 +118,47 @@ def create_app(db: Database | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="Project not found")
         stop_daemon(Path(project.path))
         return {"status": "stopped"}
+
+    @app.get("/api/activity")
+    def get_activity(
+        project_id: str | None = None,
+        change_type: str | None = None,
+        limit: int = 50,
+    ):
+        entries = db.get_all_recent_entries(
+            limit=limit,
+            project_id=project_id,
+            change_type=change_type,
+        )
+        return JSONResponse(entries)
+
+    @app.get("/api/activity/stream")
+    async def activity_stream(project_id: str | None = None):
+        """SSE endpoint. Pushes new log_entries rows as they are inserted."""
+        async def event_generator():
+            # Get the current max rowid as starting cursor
+            conn = db._get_conn()
+            row = conn.execute("SELECT MAX(rowid) as max_rowid FROM log_entries").fetchone()
+            last_rowid = row["max_rowid"] or 0
+
+            while True:
+                await asyncio.sleep(1)
+                new_entries = db.get_all_recent_entries(
+                    limit=50,
+                    project_id=project_id,
+                    after_rowid=last_rowid,
+                )
+                if new_entries:
+                    # Entries come back newest-first; send oldest-first so feed builds naturally
+                    for entry in reversed(new_entries):
+                        yield f"data: {json.dumps(entry)}\n\n"
+                        last_rowid = max(last_rowid, entry["rowid"])
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.get("/")
     def root():

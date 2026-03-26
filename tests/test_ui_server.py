@@ -107,3 +107,89 @@ def test_start_stop_project(client, tmp_path):
         response = client.post(f"/api/projects/{project_id}/stop")
         assert response.status_code == 200
         mock_stop.assert_called_once()
+
+
+def test_get_activity_empty(client):
+    response = client.get("/api/activity")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_activity_with_entries(tmp_path):
+    import uuid
+    from datetime import datetime
+    from chronicler.storage.schema import Project, Session
+    from chronicler.storage.db import Database
+
+    db_path = str(tmp_path / "test.db")
+    db = Database(db_path)
+    db.initialize()
+
+    proj_path = tmp_path / "myapp"
+    proj_path.mkdir()
+    project = Project(
+        id=str(uuid.uuid4()), name="myapp", path=str(proj_path),
+        created_at=datetime.utcnow(), git_enabled=False,
+        primary_language="python", languages=[], framework=None,
+        description=None, log_mode="debounced", ignore_patterns=[], tags=[],
+    )
+    db.insert_project(project)
+
+    session = Session(
+        id=str(uuid.uuid4()), project_id=project.id,
+        started_at=datetime.utcnow(), ended_at=None, duration_minutes=None,
+        entry_count=0, files_touched=[], primary_change_type=None,
+        session_summary=None, session_health=None,
+        key_decisions=[], open_threads=[], handoff_generated=False, tokens_used=0,
+    )
+    db.insert_session(session)
+
+    from tests.conftest import make_entry
+    db.insert_log_entry(make_entry(project.id, session.id, change_type="feature"))
+
+    app = create_app(db)
+    c = TestClient(app)
+    response = c.get("/api/activity")
+    assert response.status_code == 200
+    entries = response.json()
+    assert len(entries) == 1
+    assert entries[0]["change_type"] == "feature"
+    assert entries[0]["project_name"] == "myapp"
+    assert "rowid" in entries[0]
+
+
+def test_get_activity_filter_by_change_type(tmp_path):
+    import uuid
+    from datetime import datetime
+    from chronicler.storage.schema import Project, Session
+    from chronicler.storage.db import Database
+    from tests.conftest import make_entry
+
+    db_path = str(tmp_path / "test2.db")
+    db = Database(db_path)
+    db.initialize()
+    proj_path = tmp_path / "app2"
+    proj_path.mkdir()
+    project = Project(
+        id=str(uuid.uuid4()), name="app2", path=str(proj_path),
+        created_at=datetime.utcnow(), git_enabled=False, primary_language="python",
+        languages=[], framework=None, description=None, log_mode="debounced",
+        ignore_patterns=[], tags=[],
+    )
+    db.insert_project(project)
+    session = Session(
+        id=str(uuid.uuid4()), project_id=project.id, started_at=datetime.utcnow(),
+        ended_at=None, duration_minutes=None, entry_count=0, files_touched=[],
+        primary_change_type=None, session_summary=None, session_health=None,
+        key_decisions=[], open_threads=[], handoff_generated=False, tokens_used=0,
+    )
+    db.insert_session(session)
+    db.insert_log_entry(make_entry(project.id, session.id, change_type="feature"))
+    db.insert_log_entry(make_entry(project.id, session.id, change_type="bug_fix"))
+
+    app = create_app(db)
+    c = TestClient(app)
+    response = c.get("/api/activity?change_type=feature")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["change_type"] == "feature"
