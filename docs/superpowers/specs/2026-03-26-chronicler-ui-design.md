@@ -65,7 +65,7 @@ chronicler ui --no-open    # start server without opening browser
 | GET | `/api/activity/stream` | SSE stream — pushes new `log_entries` rows as they're inserted |
 | POST | `/api/projects/{id}/handoff` | Generate handoff doc, return markdown |
 | GET | `/api/projects/{id}/map` | Return current `CHRONICLER_MAP.md` content |
-| GET | `/api/detect-framework` | Auto-detect framework from path. Query param: `?path=`. Returns `{ "framework": "nextjs" \| "" }` |
+| GET | `/api/detect-framework` | Auto-detect framework from path. Query param: `?path=`. Returns `{ "framework": "nextjs" \| "" }`. Note: `_detect_framework()` returns `None` when undetected — coerce to `""` before serialising. |
 | GET | `/api/config/groq-key-status` | Returns `{ "detected": true \| false }` based on whether `GROQ_API_KEY` is set in env |
 | POST | `/api/config/groq-key` | Body: `{ "key": "gsk_..." }`. Writes literal key to `~/.config/chronicler/config.toml` under `[groq] api_key` and sets `os.environ["GROQ_API_KEY"]` |
 
@@ -88,6 +88,23 @@ Queries `log_entries` (using SQLite's implicit `rowid`, which is a monotonically
 
 **Important:** The `id` column is a `TEXT` UUID — not suitable for ordering or cursor comparisons. Use SQLite's built-in `rowid` (always available, always monotonic) as the SSE cursor. The `after_rowid` parameter filters `WHERE rowid > after_rowid`.
 
+Returns `list[dict]`. Each dict must include these keys (minimum required by the frontend):
+
+```python
+{
+    "rowid": int,           # SQLite rowid — used as SSE cursor
+    "id": str,              # UUID
+    "project_id": str,
+    "project_name": str,    # join from projects table
+    "change_type": str,     # e.g. "feature", "bug_fix"
+    "change_summary": str,
+    "file_relative_path": str,
+    "change_impact": str,   # "low" | "medium" | "high"
+    "timestamp": str,       # ISO format: "2026-03-26T03:27:16"
+    "session_id": str,
+}
+```
+
 The `/api/activity` route and the SSE stream both use this method. The existing `get_recent_entries(project_id, limit)` is untouched.
 
 ### Real-time flow
@@ -102,7 +119,7 @@ The SSE endpoint polls `get_all_recent_entries(after_rowid=last_seen_rowid)` on 
 
 `POST /api/projects/{id}/start` and `/api/projects/{id}/stop` operate as follows:
 
-1. Look up the project by UUID `id` using `db.get_project_by_path()` (query by id) to get its `path`
+1. Look up the project using `db.get_project(id)` to get its `path` (not `get_project_by_path` — that queries by path, not UUID)
 2. **Start**:
    - Load config: `config = load_config(project_path)`
    - Load project: `project = db.get_project_by_path(str(project_path))`
