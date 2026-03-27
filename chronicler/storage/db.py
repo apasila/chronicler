@@ -308,7 +308,7 @@ class Database:
         query += " ORDER BY le.rowid DESC LIMIT ?"
         params.append(limit)
 
-        rows = self._get_conn().execute(query, params).fetchall()
+        rows = self._get_conn().execute(query, tuple(params)).fetchall()
         return [
             {
                 "rowid": row["rowid"],
