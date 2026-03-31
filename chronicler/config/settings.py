@@ -169,8 +169,10 @@ def load_config(project_path: str, global_config_dir: str | None = None) -> Conf
 
     config = _dict_to_config(raw)
 
-    if api_key := os.environ.get("GROQ_API_KEY"):
-        config.groq.api_key = api_key
+    # Env var is a fallback only — config file key takes priority
+    if not config.groq.api_key:
+        if api_key := os.environ.get("GROQ_API_KEY"):
+            config.groq.api_key = api_key
 
     if config.custom.enabled and config.custom.api_key:
         os.environ["OPENAI_API_KEY"] = config.custom.api_key
