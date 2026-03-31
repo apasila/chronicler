@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="chronicler/ui/static/chron.png" alt="Chronicler" width="120">
+</p>
+
 # Chronicler
 
 > **Every AI coding agent starts blind. Chronicler gives it memory.**
