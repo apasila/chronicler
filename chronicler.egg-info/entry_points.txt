@@ -1,2 +1,0 @@
-[console_scripts]
-chronicler = chronicler.cli.main:app

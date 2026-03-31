@@ -9,3 +9,4 @@ build/
 *.db
 .pytest_cache/
 .superpowers/
+.DS_Store
