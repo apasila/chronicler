@@ -101,6 +101,11 @@ class ProjectConfig:
 
 
 @dataclass
+class DeliveryConfig:
+    handoff_inbox: str = ""  # folder path — handoffs are copied here as {project}-latest-handoff.md
+
+
+@dataclass
 class Config:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     models: ModelsConfig = field(default_factory=ModelsConfig)
@@ -110,6 +115,7 @@ class Config:
     ignore: IgnoreConfig = field(default_factory=IgnoreConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     project: ProjectConfig = field(default_factory=ProjectConfig)
+    delivery: DeliveryConfig = field(default_factory=DeliveryConfig)
 
 
 def _dict_to_config(d: dict) -> Config:
@@ -143,6 +149,9 @@ def _dict_to_config(d: dict) -> Config:
     if project := d.get("project"):
         cfg.project = ProjectConfig(**{k: v for k, v in project.items()
                                        if k in ProjectConfig.__dataclass_fields__})
+    if delivery := d.get("delivery"):
+        cfg.delivery = DeliveryConfig(**{k: v for k, v in delivery.items()
+                                         if k in DeliveryConfig.__dataclass_fields__})
     return cfg
 
 

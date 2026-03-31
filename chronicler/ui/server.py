@@ -36,6 +36,7 @@ class ProviderConfigRequest(BaseModel):
     custom_api_key: str = ""
     custom_model: str = "local-model"
     ignore_patterns: list[str] = []
+    handoff_inbox: str = ""
 
 
 class GroqKeyRequest(BaseModel):
@@ -302,6 +303,16 @@ def create_app(db: Database | None = None) -> FastAPI:
         out_path = project_path / ".chronicler" / "handoffs" / f"{date_str}-handoff.md"
         out_path.parent.mkdir(exist_ok=True)
         out_path.write_text(output)
+
+        # Deliver to agent inbox if configured
+        inbox = config.delivery.handoff_inbox.strip()
+        if inbox:
+            import shutil
+            inbox_dir = Path(inbox).expanduser()
+            inbox_dir.mkdir(parents=True, exist_ok=True)
+            safe_name = project.name.lower().replace(" ", "-")
+            inbox_dir.joinpath(f"{safe_name}-latest-handoff.md").write_text(output)
+
         return {"markdown": output, "saved_to": str(out_path)}
 
     @app.get("/api/config/groq-key-status")
@@ -376,6 +387,7 @@ def create_app(db: Database | None = None) -> FastAPI:
             "custom_api_key": "",  # never expose actual key
             "custom_model": custom_model,
             "ignore_patterns": load_config(str(Path.home()), str(Path.home() / ".config" / "chronicler")).ignore.patterns,
+            "handoff_inbox": config_data.get("delivery", {}).get("handoff_inbox", ""),
         }
 
     @app.post("/api/config/provider")
@@ -434,6 +446,11 @@ def create_app(db: Database | None = None) -> FastAPI:
         if "ignore" not in config_data:
             config_data["ignore"] = {}
         config_data["ignore"]["global_patterns"] = user_only
+
+        # Update [delivery]
+        if "delivery" not in config_data:
+            config_data["delivery"] = {}
+        config_data["delivery"]["handoff_inbox"] = req.handoff_inbox
 
         global_config_path.parent.mkdir(parents=True, exist_ok=True)
         global_config_path.write_text(toml.dumps(config_data))

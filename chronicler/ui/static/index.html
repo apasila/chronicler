@@ -853,6 +853,16 @@
       <span style="color:var(--muted);font-size:10px">Glob patterns — e.g. .next/**, *.log, dist/**</span>
     </div>
 
+    <!-- Agent Inbox section -->
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Agent Inbox</label>
+      <p class="text-xs mb-2" style="color:var(--muted-fg)">Handoffs are auto-copied here as <span style="font-family:'IBM Plex Mono',monospace;color:var(--fg-secondary)">{project}-latest-handoff.md</span> — point your AI agent at this folder.</p>
+      <div class="flex items-center gap-2">
+        <input x-model="settingsHandoffInbox" class="input" style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:11px" placeholder="e.g. ~/Desktop/M-shared/chronicler_inbox">
+        <button @click="openFolderBrowser('inbox')" class="btn btn-outline btn-sm" style="white-space:nowrap">Browse</button>
+      </div>
+    </div>
+
     <!-- Footer -->
     <div class="flex items-center justify-between mt-5">
       <span class="text-xs" style="color:var(--muted-fg)">Restart project watchers for changes to take effect</span>
@@ -908,6 +918,7 @@ function chroniclerApp() {
     settingsCustomModel: 'local-model',
     settingsIgnorePatterns: [],
     settingsNewPattern: '',
+    settingsHandoffInbox: '',
     settingsSaved: false,
 
     hints: [
@@ -985,6 +996,8 @@ function chroniclerApp() {
         this.onboardingPath = path;
         if (!this.onboardingName) this.onboardingName = path.split('/').pop();
         this.detectFramework();
+      } else if (this.browserTarget === 'inbox') {
+        this.settingsHandoffInbox = path;
       }
       this.showFolderBrowser = false;
     },
@@ -1182,6 +1195,7 @@ function chroniclerApp() {
       this.settingsCustomKey = d.custom_api_key ? '••••••••' : '';
       this.settingsCustomModel = d.custom_model;
       this.settingsIgnorePatterns = d.ignore_patterns || [];
+      this.settingsHandoffInbox = d.handoff_inbox || '';
     },
 
     async saveSettings() {
@@ -1198,6 +1212,7 @@ function chroniclerApp() {
           custom_api_key: this.settingsCustomKey.includes('•') ? '' : this.settingsCustomKey,
           custom_model: this.settingsCustomModel,
           ignore_patterns: this.settingsIgnorePatterns,
+          handoff_inbox: this.settingsHandoffInbox,
         }),
       });
       this.settingsSaved = true;
