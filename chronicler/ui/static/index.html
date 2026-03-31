@@ -595,12 +595,15 @@
      @click.self="handoffResult = null">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:620px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
     <div class="flex items-center justify-between p-5 pb-0 mb-4">
-      <h3 style="font-family:'Crimson Pro',serif;font-size:18px;font-weight:600">✦ Handoff Document</h3>
+      <div class="flex items-center gap-3">
+        <h3 style="font-family:'Crimson Pro',serif;font-size:18px;font-weight:600">✦ Handoff Document</h3>
+        <span x-show="handoffCopied" class="text-xs font-medium" style="color:var(--green)">Copied to clipboard ✓</span>
+      </div>
       <button @click="handoffResult = null" class="btn btn-ghost btn-sm">✕</button>
     </div>
     <pre class="flex-1 overflow-y-auto text-xs mx-5 mb-3 p-4 rounded-lg whitespace-pre-wrap font-mono" style="background:var(--bg);color:var(--fg-secondary);border:1px solid var(--border)" x-text="handoffResult"></pre>
     <div class="px-5 pb-5">
-      <button @click="navigator.clipboard.writeText(handoffResult).then(() => alert('Copied to clipboard!'))" class="btn btn-outline btn-sm">Copy to clipboard</button>
+      <button @click="navigator.clipboard.writeText(handoffResult).then(() => { handoffCopied = true; setTimeout(() => handoffCopied = false, 3000); })" class="btn btn-outline btn-sm" x-text="handoffCopied ? 'Copied ✓' : 'Copy to clipboard'"></button>
     </div>
   </div>
 </div>
@@ -885,6 +888,7 @@ function chroniclerApp() {
     newProjectPath: '',
     newProjectName: '',
     handoffResult: null,
+    handoffCopied: false,
     mapResult: null,
     activityEntries: [],
     logEntries: [],
@@ -1022,6 +1026,13 @@ function chroniclerApp() {
       const res = await fetch(`/api/projects/${project.id}/handoff`, { method: 'POST' });
       const data = await res.json();
       this.handoffResult = data.markdown || data.detail;
+      this.handoffCopied = false;
+      if (data.markdown) {
+        navigator.clipboard.writeText(data.markdown).then(() => {
+          this.handoffCopied = true;
+          setTimeout(() => { this.handoffCopied = false; }, 3000);
+        }).catch(() => {});
+      }
     },
 
     async generateHandoffAll() {
