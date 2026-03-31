@@ -14,15 +14,17 @@ def _parse_dt(s: str | None) -> datetime | None:
 class Database:
     def __init__(self, db_path: str):
         self.db_path = str(Path(db_path).expanduser())
-        self._conn: sqlite3.Connection | None = None
+        self._local = threading.local()
         self._lock = threading.Lock()
 
     def _get_conn(self) -> sqlite3.Connection:
-        if self._conn is None:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-        return self._conn
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            self._local.conn = conn
+        return conn
 
     def initialize(self) -> None:
         with self._lock:
@@ -127,6 +129,14 @@ class Database:
             "SELECT * FROM projects WHERE id=?", (project_id,)
         ).fetchone()
         return self._row_to_project(row) if row else None
+
+    def delete_project(self, project_id: str) -> None:
+        with self._lock:
+            conn = self._get_conn()
+            conn.execute("DELETE FROM log_entries WHERE project_id=?", (project_id,))
+            conn.execute("DELETE FROM sessions WHERE project_id=?", (project_id,))
+            conn.execute("DELETE FROM projects WHERE id=?", (project_id,))
+            conn.commit()
 
     def get_project_by_path(self, path: str) -> Project | None:
         row = self._get_conn().execute(
@@ -356,6 +366,7 @@ class Database:
         )
 
     def close(self) -> None:
-        if self._conn:
-            self._conn.close()
-            self._conn = None
+        conn = getattr(self._local, "conn", None)
+        if conn:
+            conn.close()
+            self._local.conn = None

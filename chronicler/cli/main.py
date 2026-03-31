@@ -274,7 +274,7 @@ def ui(
         webbrowser.open(url)
 
     app_instance = create_app()
-    uvicorn.run(app_instance, host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run(app_instance, host="127.0.0.1", port=port, log_level="warning", timeout_graceful_shutdown=1)
 
 
 def _run_watcher(project, config, db) -> None:

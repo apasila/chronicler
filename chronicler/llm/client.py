@@ -30,6 +30,15 @@ class LLMClient:
         """Returns (response_text, tokens_used, processing_ms)."""
         model = get_model_for_task(task, self.config)
         start = time.time()
+
+        kwargs: dict = {}
+        if model.startswith("ollama/"):
+            kwargs["api_base"] = self.config.ollama.base_url
+        elif model.startswith("openai/") and self.config.custom.enabled:
+            kwargs["api_base"] = self.config.custom.base_url
+            if self.config.custom.api_key:
+                kwargs["api_key"] = self.config.custom.api_key
+
         response = litellm.completion(
             model=model,
             messages=[
@@ -37,6 +46,7 @@ class LLMClient:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=temperature,
+            **kwargs,
         )
         elapsed_ms = int((time.time() - start) * 1000)
         text = response.choices[0].message.content or ""

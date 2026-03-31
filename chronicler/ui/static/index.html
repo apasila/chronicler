@@ -72,8 +72,8 @@
   ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 10px; }
 
   /* Traffic light */
-  .dot { width: 9px; height: 9px; border-radius: 50%; cursor: pointer; flex-shrink: 0; transition: transform 0.15s, box-shadow 0.15s; }
-  .dot:hover { transform: scale(1.5); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; cursor: pointer; flex-shrink: 0; transition: transform 0.15s, box-shadow 0.15s; padding: 5px; background-clip: content-box; box-sizing: content-box; }
+  .dot:hover { transform: scale(1.4); }
   .dot-running { background: var(--green); box-shadow: 0 0 8px rgba(74,222,128,0.5); }
   .dot-stopped { background: var(--muted); }
   .pulse { animation: pulse 2.4s ease-in-out infinite; }
@@ -194,6 +194,13 @@
   <div class="flex-1"></div>
   <!-- Hint -->
   <div class="hidden md:block text-xs px-3 py-1 rounded-md" style="color:var(--muted-fg);background:var(--surface-2);border:1px solid var(--border)" x-text="currentHint"></div>
+  <!-- Settings gear -->
+  <button @click="showSettings = true; loadSettings()" class="btn btn-ghost" style="padding:5px 8px" title="Model settings">
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10" cy="10" r="3"/>
+      <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+    </svg>
+  </button>
   <!-- Live -->
   <div class="flex items-center gap-1.5 text-xs" style="color:var(--green)">
     <div class="w-1.5 h-1.5 rounded-full pulse" style="background:var(--green)"></div>
@@ -230,7 +237,7 @@
              :class="selectedProjectId === project.id ? 'active' : ''"
              @click="selectedProjectId = project.id; activeTab = 'activity'; loadActivity()">
           <!-- Name row -->
-          <div class="flex items-center gap-2 mb-2">
+          <div class="flex items-center mb-2" style="gap:10px">
             <div class="dot"
                  :class="project.status === 'running' ? 'dot-running' : 'dot-stopped'"
                  :title="project.status === 'running' ? 'Watching — click to stop' : 'Not watching — click to start'"
@@ -241,21 +248,34 @@
                   class="badge" style="background:var(--surface-2);color:var(--muted-fg);border:1px solid var(--border);font-size:10px"></span>
           </div>
           <!-- Stats -->
-          <div class="mb-2.5">
-            <span class="font-semibold" style="font-size:20px; line-height:1"
-                  :style="project.status === 'running' ? 'color:var(--green)' : 'color:var(--muted)'"
-                  x-text="(projectChangesToday[project.id] || 0)"></span>
-            <span class="ml-1 text-xs" style="color:var(--muted-fg)">changes today</span>
+          <div class="mb-2.5 flex items-baseline gap-3">
+            <div>
+              <span class="font-semibold" style="font-size:20px;line-height:1"
+                    :style="project.status === 'running' ? 'color:var(--green)' : 'color:var(--muted)'"
+                    x-text="(projectChangesToday[project.id] || 0)"></span>
+              <span class="ml-1 text-xs" style="color:var(--muted-fg)">today</span>
+            </div>
+            <div style="color:var(--border)">·</div>
+            <div>
+              <span class="font-semibold" style="font-size:13px;color:var(--muted-fg)"
+                    x-text="(project.total_changes || 0).toLocaleString()"></span>
+              <span class="ml-1 text-xs" style="color:var(--muted)">total</span>
+            </div>
           </div>
           <!-- Actions -->
           <div class="flex gap-1.5">
-            <button @click.stop="viewMap(project)" class="btn btn-ghost btn-sm flex-1 justify-center"
-                    title="View the auto-generated overview of this project">Map</button>
+            <button @click.stop="viewMap(project)" class="btn btn-ghost btn-sm justify-center"
+                    style="flex:1" title="View the auto-generated overview of this project">Map</button>
             <button @click.stop="generateHandoff(project)"
-                    class="btn btn-sm flex-1 justify-center"
-                    style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-border)"
+                    class="btn btn-sm justify-center"
+                    style="flex:1;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-border)"
                     title="Generate a briefing so your AI agent can pick up where you left off">
               ✦ Handoff
+            </button>
+            <button @click.stop="removeProject(project)" class="btn btn-ghost btn-sm"
+                    style="padding:3px 7px;color:var(--muted-fg)"
+                    title="Remove this project from Chronicler">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </button>
           </div>
         </div>
@@ -270,6 +290,7 @@
     <div class="flex items-center px-5" style="height:44px; border-bottom:1px solid var(--border); background:var(--surface)">
       <button @click="activeTab = 'activity'; loadActivity()" class="tab-btn" :class="activeTab === 'activity' ? 'active' : ''">Activity</button>
       <button @click="activeTab = 'log'; loadLog()" class="tab-btn" :class="activeTab === 'log' ? 'active' : ''">Full Log</button>
+      <button @click="activeTab = 'usage'; loadUsage()" class="tab-btn" :class="activeTab === 'usage' ? 'active' : ''">Usage</button>
       <div class="flex-1"></div>
       <button @click="generateHandoffAll()" class="btn btn-gradient btn-sm"
               title="Generate a briefing document for all running projects — paste to your AI agent">
@@ -381,6 +402,114 @@
         </template>
       </div>
     </div>
+
+    <!-- ── Usage Tab ──────────────────────────────────────────────────── -->
+    <div x-show="activeTab === 'usage'" class="flex-1 overflow-y-auto px-6 py-5">
+      <template x-if="!usageData">
+        <div class="text-center py-16 text-sm" style="color:var(--muted-fg)">Loading usage data...</div>
+      </template>
+      <template x-if="usageData">
+        <div class="space-y-6" style="max-width:760px">
+
+          <!-- Headline stats -->
+          <div class="grid grid-cols-3 gap-4">
+            <div class="rounded-xl p-4" style="background:var(--surface);border:1px solid var(--border)">
+              <div class="text-xs uppercase tracking-wider mb-1" style="color:var(--muted-fg)">Total LLM calls</div>
+              <div class="font-semibold" style="font-size:28px;line-height:1.1" x-text="(usageData.total_calls).toLocaleString()"></div>
+            </div>
+            <div class="rounded-xl p-4" style="background:var(--surface);border:1px solid var(--border)">
+              <div class="text-xs uppercase tracking-wider mb-1" style="color:var(--muted-fg)">Tokens used</div>
+              <div class="font-semibold" style="font-size:28px;line-height:1.1" x-text="usageData.total_tokens >= 1000000 ? (usageData.total_tokens/1000000).toFixed(2)+'M' : (usageData.total_tokens/1000).toFixed(1)+'K'"></div>
+            </div>
+            <div class="rounded-xl p-4" style="background:var(--surface);border:1px solid var(--border)">
+              <div class="text-xs uppercase tracking-wider mb-1" style="color:var(--muted-fg)">Est. total cost</div>
+              <div class="font-semibold" style="font-size:28px;line-height:1.1;color:var(--green)"
+                   x-text="usageData.total_cost < 0.01 ? '< $0.01' : '$' + usageData.total_cost.toFixed(3)"></div>
+              <div class="text-xs mt-0.5" style="color:var(--muted)">based on provider pricing</div>
+            </div>
+          </div>
+
+          <!-- By model -->
+          <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">By Model</h3>
+            <div class="rounded-xl overflow-hidden" style="border:1px solid var(--border)">
+              <template x-for="(m, i) in usageData.by_model" :key="m.model">
+                <div class="flex items-center gap-4 px-4 py-3"
+                     :style="i > 0 ? 'border-top:1px solid var(--border-subtle)' : ''">
+                  <div class="flex-1 min-w-0">
+                    <div class="font-mono text-xs font-semibold truncate" style="color:var(--fg)" x-text="m.model"></div>
+                    <div class="text-xs mt-0.5" style="color:var(--muted-fg)">
+                      <span x-text="m.calls.toLocaleString()"></span> calls ·
+                      <span x-text="m.avg_ms"></span>ms avg
+                    </div>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <div class="text-xs font-semibold" style="color:var(--fg)"
+                         x-text="m.tokens >= 1000000 ? (m.tokens/1000000).toFixed(2)+'M tokens' : (m.tokens/1000).toFixed(1)+'K tokens'"></div>
+                    <div class="text-xs mt-0.5"
+                         :style="m.free ? 'color:var(--green)' : 'color:var(--muted-fg)'"
+                         x-text="m.free ? 'local / free' : '$' + m.cost.toFixed(4)"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="text-xs mt-2" style="color:var(--muted)">
+              Costs are estimates based on public provider pricing. Groq free tier has generous rate limits — this is for reference only.
+            </div>
+          </div>
+
+          <!-- By project -->
+          <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">By Project</h3>
+            <div class="rounded-xl overflow-hidden" style="border:1px solid var(--border)">
+              <template x-for="(p, i) in usageData.by_project" :key="p.name">
+                <div class="px-4 py-3" :style="i > 0 ? 'border-top:1px solid var(--border-subtle)' : ''">
+                  <div class="flex items-center gap-3 mb-1.5">
+                    <span class="font-semibold text-sm" style="color:var(--fg)" x-text="p.name"></span>
+                    <span class="text-xs" style="color:var(--muted-fg)">
+                      <span x-text="p.calls.toLocaleString()"></span> calls ·
+                      <span x-text="p.tokens >= 1000000 ? (p.tokens/1000000).toFixed(2)+'M' : (p.tokens/1000).toFixed(1)+'K'"></span> tokens
+                    </span>
+                  </div>
+                  <!-- Token bar -->
+                  <div class="rounded-full overflow-hidden" style="height:4px;background:var(--surface-2)">
+                    <div class="rounded-full h-full" style="background:var(--accent);transition:width 0.4s"
+                         :style="`width:${Math.round((p.tokens / usageData.total_tokens) * 100)}%`"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Daily breakdown (last 14 days) -->
+          <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">Daily Activity (last 30 days)</h3>
+            <div class="rounded-xl p-4" style="background:var(--surface);border:1px solid var(--border)">
+              <template x-if="usageData.by_day.length === 0">
+                <div class="text-xs text-center py-4" style="color:var(--muted-fg)">No data yet</div>
+              </template>
+              <div class="space-y-1.5">
+                <template x-for="d in usageData.by_day.slice(0,14)" :key="d.day">
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-xs flex-shrink-0 w-24" style="color:var(--muted-fg)" x-text="d.day"></span>
+                    <div class="flex-1 rounded-full overflow-hidden" style="height:6px;background:var(--surface-2)">
+                      <div class="rounded-full h-full" style="background:var(--accent-border);transition:width 0.4s"
+                           :style="`width:${Math.round((d.tokens / Math.max(...usageData.by_day.map(x=>x.tokens))) * 100)}%`"></div>
+                    </div>
+                    <span class="font-mono text-xs flex-shrink-0 w-20 text-right" style="color:var(--muted-fg)"
+                          x-text="d.tokens >= 1000 ? (d.tokens/1000).toFixed(1)+'K tok' : d.tokens+' tok'"></span>
+                    <span class="font-mono text-xs flex-shrink-0 w-14 text-right" style="color:var(--muted)"
+                          x-text="d.calls + ' calls'"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </template>
+    </div>
+
   </main>
 </div>
 
@@ -393,7 +522,22 @@
     <div class="space-y-3">
       <div>
         <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Project folder</label>
-        <input x-model="newProjectPath" class="input" placeholder="/path/to/your/project">
+        <div class="flex gap-2">
+          <div class="input flex-1 flex items-center gap-2 cursor-default"
+               style="min-height:36px;overflow:hidden"
+               :style="newProjectPath ? 'color:var(--fg)' : 'color:var(--muted-fg)'">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;opacity:0.5">
+              <path d="M1 3.5A1.5 1.5 0 012.5 2H5l1.5 2H11.5A1.5 1.5 0 0113 5.5v5A1.5 1.5 0 0111.5 12h-9A1.5 1.5 0 011 10.5v-7z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            </svg>
+            <span class="font-mono truncate" style="font-size:11px" x-text="newProjectPath || 'No folder selected'"></span>
+          </div>
+          <button @click.stop="openFolderBrowser('new')" class="btn btn-outline" style="flex-shrink:0;white-space:nowrap">
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+              <path d="M1 3.5A1.5 1.5 0 012.5 2H5l1.5 2H11.5A1.5 1.5 0 0113 5.5v5A1.5 1.5 0 0111.5 12h-9A1.5 1.5 0 011 10.5v-7z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            </svg>
+            Choose folder
+          </button>
+        </div>
       </div>
       <div>
         <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Name</label>
@@ -402,7 +546,45 @@
     </div>
     <div class="flex gap-2 justify-end mt-5">
       <button @click="showAddProject = false" class="btn btn-ghost">Cancel</button>
-      <button @click="addProject()" class="btn btn-gradient">Add project</button>
+      <button @click="addProject()" class="btn btn-gradient" :disabled="!newProjectPath">Add project</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Folder Browser Modal ────────────────────────────────────────── -->
+<div x-show="showFolderBrowser" x-cloak
+     class="modal-bg fixed inset-0 flex items-center justify-center"
+     style="z-index:9999"
+     @click.self="showFolderBrowser = false">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:480px;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="opacity:0.5;flex-shrink:0">
+        <path d="M1 3.5A1.5 1.5 0 012.5 2H5l1.5 2H11.5A1.5 1.5 0 0113 5.5v5A1.5 1.5 0 0111.5 12h-9A1.5 1.5 0 011 10.5v-7z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+      </svg>
+      <span class="font-mono text-xs truncate" style="color:var(--fg-secondary);flex:1" x-text="browserPath"></span>
+      <button x-show="browserParent" @click="browseDir(browserParent)"
+              class="btn btn-ghost" style="padding:2px 8px;font-size:11px;flex-shrink:0">↑ Up</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:8px">
+      <template x-for="dir in browserDirs" :key="dir">
+        <button @click="browseDir(browserPath + '/' + dir)"
+                class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                style="color:var(--fg-secondary)"
+                onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style="opacity:0.4;flex-shrink:0">
+            <path d="M1 3.5A1.5 1.5 0 012.5 2H5l1.5 2H11.5A1.5 1.5 0 0113 5.5v5A1.5 1.5 0 0111.5 12h-9A1.5 1.5 0 011 10.5v-7z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          </svg>
+          <span x-text="dir"></span>
+        </button>
+      </template>
+      <div x-show="browserDirs.length === 0" class="px-3 py-4 text-xs text-center" style="color:var(--muted-fg)">No subfolders</div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <span class="text-xs" style="color:var(--muted-fg)">Select this folder or navigate into a subfolder</span>
+      <div class="flex gap-2">
+        <button @click="showFolderBrowser = false" class="btn btn-ghost btn-sm">Cancel</button>
+        <button @click="confirmBrowserFolder()" class="btn btn-gradient btn-sm">Select</button>
+      </div>
     </div>
   </div>
 </div>
@@ -425,7 +607,8 @@
 
 <!-- ── Map Modal ───────────────────────────────────────────────────── -->
 <div x-show="mapResult" x-cloak
-     class="modal-bg fixed inset-0 flex items-center justify-center z-50"
+     class="modal-bg fixed inset-0 flex items-center justify-center"
+     style="z-index:9999"
      @click.self="mapResult = null">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:620px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
     <div class="flex items-center justify-between p-5 pb-0 mb-4">
@@ -481,9 +664,22 @@
       <div class="space-y-3 mb-5">
         <div>
           <label class="text-xs font-semibold uppercase tracking-wider mb-1.5 block" style="color:var(--muted-fg)">Project folder <span class="font-normal normal-case" style="color:var(--muted)">— where your code lives</span></label>
-          <input x-model="onboardingPath" @blur="detectFramework()"
-                 class="input" placeholder="/Users/you/projects/my-app"
-                 title="Paste the full path to your project folder">
+          <div class="flex gap-2">
+            <div class="input flex-1 flex items-center gap-2 cursor-default"
+                 style="min-height:36px;overflow:hidden"
+                 :style="onboardingPath ? 'color:var(--fg)' : 'color:var(--muted-fg)'">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;opacity:0.5">
+                <path d="M1 3.5A1.5 1.5 0 012.5 2H5l1.5 2H11.5A1.5 1.5 0 0113 5.5v5A1.5 1.5 0 0111.5 12h-9A1.5 1.5 0 011 10.5v-7z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+              </svg>
+              <span class="font-mono truncate" style="font-size:11px" x-text="onboardingPath || '/Users/you/projects/my-app'"></span>
+            </div>
+            <button @click.stop="openFolderBrowser('onboarding')" class="btn btn-outline" style="flex-shrink:0;white-space:nowrap">
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path d="M1 3.5A1.5 1.5 0 012.5 2H5l1.5 2H11.5A1.5 1.5 0 0113 5.5v5A1.5 1.5 0 0111.5 12h-9A1.5 1.5 0 011 10.5v-7z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+              </svg>
+              Choose folder
+            </button>
+          </div>
           <div x-show="onboardingFramework" class="mt-1.5 inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full" style="color:var(--green);background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2)">
             ✓ <span x-text="onboardingFramework"></span> detected
           </div>
@@ -559,6 +755,115 @@
   </div>
 </div>
 
+<!-- ── Settings Modal ──────────────────────────────────────────────── -->
+<div x-show="showSettings" x-cloak
+     class="modal-bg fixed inset-0 flex items-center justify-center"
+     style="z-index:9999"
+     @click.self="showSettings = false">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:420px;padding:24px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <div class="flex items-center justify-between mb-5">
+      <h3 style="font-family:'Crimson Pro',serif;font-size:18px;font-weight:600">Model Settings</h3>
+      <button @click="showSettings = false" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+
+    <!-- Provider segmented control -->
+    <div class="flex mb-5 rounded-lg overflow-hidden" style="border:1px solid var(--border);background:var(--bg)">
+      <template x-for="p in ['groq','ollama','custom']" :key="p">
+        <button @click="settingsProvider = p"
+                class="flex-1 py-2 text-xs font-semibold transition-all"
+                :style="settingsProvider === p
+                  ? 'background:var(--accent);color:#0c0a09;'
+                  : 'background:transparent;color:var(--muted-fg);'"
+                x-text="p.charAt(0).toUpperCase() + p.slice(1)">
+        </button>
+      </template>
+    </div>
+
+    <!-- Groq section -->
+    <div x-show="settingsProvider === 'groq'" class="space-y-3">
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">
+          API Key
+          <a href="https://console.groq.com/keys" target="_blank" class="ml-2 normal-case font-normal" style="color:var(--accent);text-decoration:underline">Get a free key →</a>
+        </label>
+        <input x-model="settingsGroqKey" type="password" class="input" placeholder="gsk_...">
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Model</label>
+        <select x-model="settingsGroqModel" class="input" style="cursor:pointer">
+          <option value="groq/llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+          <option value="groq/llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+          <option value="groq/mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+          <option value="groq/gemma2-9b-it">gemma2-9b-it</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Ollama section -->
+    <div x-show="settingsProvider === 'ollama'" class="space-y-3">
+      <div class="rounded-lg px-3 py-2 text-xs" style="background:var(--surface-2);border:1px solid var(--border);color:var(--muted-fg)">
+        Ollama must be running locally
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Base URL</label>
+        <input x-model="settingsOllamaUrl" class="input" placeholder="http://localhost:11434">
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Model name</label>
+        <input x-model="settingsOllamaModel" class="input" placeholder="phi4">
+      </div>
+    </div>
+
+    <!-- Custom section -->
+    <div x-show="settingsProvider === 'custom'" class="space-y-3">
+      <div class="rounded-lg px-3 py-2 text-xs" style="background:var(--surface-2);border:1px solid var(--border);color:var(--muted-fg)">
+        Compatible with llama.cpp, LM Studio, vLLM, and any OpenAI-compatible server
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Base URL</label>
+        <input x-model="settingsCustomUrl" class="input" placeholder="http://localhost:8080/v1">
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">API Key <span class="font-normal normal-case" style="color:var(--muted)">(optional)</span></label>
+        <input x-model="settingsCustomKey" type="password" class="input" placeholder="sk-... (leave blank if not required)">
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-1 block" style="color:var(--muted-fg)">Model name</label>
+        <input x-model="settingsCustomModel" class="input" placeholder="local-model">
+      </div>
+    </div>
+
+    <!-- Ignore Patterns section -->
+    <div style="margin-top:16px">
+      <label class="text-xs font-semibold uppercase tracking-wider mb-2 block" style="color:var(--muted-fg)">Ignore Patterns</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px" x-show="settingsIgnorePatterns.length > 0">
+        <template x-for="(pattern, i) in settingsIgnorePatterns" :key="i">
+          <span style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;font-family:'IBM Plex Mono',monospace;display:inline-flex;align-items:center;gap:4px">
+            <span x-text="pattern"></span>
+            <button @click="settingsIgnorePatterns.splice(i, 1)" style="color:var(--muted-fg);background:none;border:none;cursor:pointer;padding:0;line-height:1;font-size:12px" title="Remove">×</button>
+          </span>
+        </template>
+      </div>
+      <div class="flex items-center gap-2">
+        <input x-model="settingsNewPattern" class="input" style="flex:1" placeholder="e.g. node_modules/**, *.log"
+               @keydown.enter="if (settingsNewPattern.trim() && !settingsIgnorePatterns.includes(settingsNewPattern.trim())) { settingsIgnorePatterns.push(settingsNewPattern.trim()); settingsNewPattern = ''; }">
+        <button class="btn btn-outline btn-sm"
+                @click="if (settingsNewPattern.trim() && !settingsIgnorePatterns.includes(settingsNewPattern.trim())) { settingsIgnorePatterns.push(settingsNewPattern.trim()); settingsNewPattern = ''; }">+ Add</button>
+      </div>
+      <span style="color:var(--muted);font-size:10px">Glob patterns — e.g. .next/**, *.log, dist/**</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-between mt-5">
+      <span class="text-xs" style="color:var(--muted-fg)">Restart project watchers for changes to take effect</span>
+      <div class="flex items-center gap-2">
+        <span x-show="settingsSaved" class="text-xs" style="color:var(--green)">Saved ✓</span>
+        <button @click="saveSettings()" class="btn btn-gradient btn-sm">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function chroniclerApp() {
   return {
@@ -566,6 +871,7 @@ function chroniclerApp() {
     projectChangesToday: {},
     selectedProjectId: null,
     activeTab: 'activity',
+    usageData: null,
     showAddProject: false,
     newProjectPath: '',
     newProjectName: '',
@@ -579,6 +885,11 @@ function chroniclerApp() {
     logSessions: [],
     logProjectFilter: '',
     expandedDiffs: {},
+    showFolderBrowser: false,
+    browserPath: '',
+    browserParent: null,
+    browserDirs: [],
+    browserTarget: null, // 'new' or 'onboarding'
     showOnboarding: false,
     onboardingStep: 1,
     onboardingPath: '',
@@ -586,6 +897,19 @@ function chroniclerApp() {
     onboardingFramework: '',
     onboardingKeyDetected: false,
     onboardingKey: '',
+    showSettings: false,
+    settingsProvider: 'groq',
+    settingsGroqKey: '',
+    settingsGroqModel: 'groq/llama-3.3-70b-versatile',
+    settingsOllamaUrl: 'http://localhost:11434',
+    settingsOllamaModel: 'phi4',
+    settingsCustomUrl: 'http://localhost:8080/v1',
+    settingsCustomKey: '',
+    settingsCustomModel: 'local-model',
+    settingsIgnorePatterns: [],
+    settingsNewPattern: '',
+    settingsSaved: false,
+
     hints: [
       'Click the coloured dot to start or stop watching a project',
       'Use ✦ Generate Handoff before handing off to an AI assistant',
@@ -615,24 +939,71 @@ function chroniclerApp() {
     async loadProjects() {
       const res = await fetch('/api/projects');
       this.projects = await res.json();
+      // Auto-select first project if nothing is selected yet
+      if (!this.selectedProjectId && this.projects.length > 0) {
+        this.selectedProjectId = this.projects[0].id;
+      }
     },
 
     async toggleDaemon(project) {
       const action = project.status === 'running' ? 'stop' : 'start';
-      await fetch(`/api/projects/${project.id}/${action}`, { method: 'POST' });
+      const res = await fetch(`/api/projects/${project.id}/${action}`, { method: 'POST' });
+      if (!res.ok && action === 'start') {
+        const body = await res.json().catch(() => ({}));
+        const msg = body.detail || 'Failed to start watcher. Check that your GROQ_API_KEY is set and the project path is valid.';
+        alert(`Could not start watcher:\n\n${msg}`);
+      }
       await this.loadProjects();
+    },
+
+    async removeProject(project) {
+      if (!confirm(`Remove "${project.name}" from Chronicler?\n\nThis deletes all logged activity for this project. The project folder itself is not affected.`)) return;
+      await fetch(`/api/projects/${project.id}`, { method: 'DELETE' });
+      await this.loadProjects();
+    },
+
+    async openFolderBrowser(target) {
+      this.browserTarget = target;
+      await this.browseDir('~');
+      this.showFolderBrowser = true;
+    },
+
+    async browseDir(path) {
+      const res = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+      const data = await res.json();
+      this.browserPath = data.path;
+      this.browserParent = data.parent;
+      this.browserDirs = data.dirs;
+    },
+
+    confirmBrowserFolder() {
+      const path = this.browserPath;
+      if (this.browserTarget === 'new') {
+        this.newProjectPath = path;
+        if (!this.newProjectName) this.newProjectName = path.split('/').pop();
+      } else if (this.browserTarget === 'onboarding') {
+        this.onboardingPath = path;
+        if (!this.onboardingName) this.onboardingName = path.split('/').pop();
+        this.detectFramework();
+      }
+      this.showFolderBrowser = false;
     },
 
     async addProject() {
       const name = this.newProjectName || this.newProjectPath.split('/').pop();
-      await fetch('/api/projects', {
+      const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: this.newProjectPath, name }),
       });
+      const project = await res.json();
       this.newProjectPath = '';
       this.newProjectName = '';
       this.showAddProject = false;
+      // Auto-start watching the new project
+      if (project.id) {
+        await fetch(`/api/projects/${project.id}/start`, { method: 'POST' });
+      }
       await this.loadProjects();
     },
 
@@ -675,6 +1046,11 @@ function chroniclerApp() {
       }
     },
 
+    async loadUsage() {
+      const res = await fetch('/api/usage');
+      this.usageData = await res.json();
+    },
+
     async loadLog() {
       let url = `/api/activity?limit=200`;
       if (this.logChangeType) url += `&change_type=${this.logChangeType}`;
@@ -702,12 +1078,18 @@ function chroniclerApp() {
       source.onmessage = (event) => {
         const entry = JSON.parse(event.data);
         entry._new = true;
-        this.activityEntries.unshift(entry);
-        if (this.activityEntries.length > 100) this.activityEntries.pop();
+        // Only add to visible feed if it matches the current project filter
+        if (!this.selectedProjectId || entry.project_id === this.selectedProjectId) {
+          this.activityEntries.unshift(entry);
+          if (this.activityEntries.length > 100) this.activityEntries.pop();
+        }
         const today = new Date().toISOString().slice(0, 10);
         if (entry.timestamp.startsWith(today)) {
           this.projectChangesToday[entry.project_id] = (this.projectChangesToday[entry.project_id] || 0) + 1;
         }
+        // Update total count
+        const proj = this.projects.find(p => p.id === entry.project_id);
+        if (proj) proj.total_changes = (proj.total_changes || 0) + 1;
         setTimeout(() => { entry._new = false; }, 3000);
       };
       source.onerror = () => { setTimeout(() => this.connectSSE(), 5000); };
@@ -767,11 +1149,15 @@ function chroniclerApp() {
     async completeOnboarding() {
       if (this.onboardingPath) {
         const name = this.onboardingName || this.onboardingPath.split('/').pop();
-        await fetch('/api/projects', {
+        const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: this.onboardingPath, name }),
         });
+        const project = await res.json();
+        if (project.id) {
+          await fetch(`/api/projects/${project.id}/start`, { method: 'POST' });
+        }
         await this.loadProjects();
       }
       if (this.onboardingKey) {
@@ -782,6 +1168,40 @@ function chroniclerApp() {
         });
       }
       this.showOnboarding = false;
+    },
+
+    async loadSettings() {
+      const res = await fetch('/api/config/provider');
+      const d = await res.json();
+      this.settingsProvider = d.provider;
+      this.settingsGroqKey = d.groq_key_set ? '••••••••' : '';
+      this.settingsGroqModel = d.groq_model;
+      this.settingsOllamaUrl = d.ollama_base_url;
+      this.settingsOllamaModel = d.ollama_model;
+      this.settingsCustomUrl = d.custom_base_url;
+      this.settingsCustomKey = d.custom_api_key ? '••••••••' : '';
+      this.settingsCustomModel = d.custom_model;
+      this.settingsIgnorePatterns = d.ignore_patterns || [];
+    },
+
+    async saveSettings() {
+      await fetch('/api/config/provider', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: this.settingsProvider,
+          groq_key: this.settingsGroqKey.includes('•') ? '' : this.settingsGroqKey,
+          groq_model: this.settingsGroqModel,
+          ollama_base_url: this.settingsOllamaUrl,
+          ollama_model: this.settingsOllamaModel,
+          custom_base_url: this.settingsCustomUrl,
+          custom_api_key: this.settingsCustomKey.includes('•') ? '' : this.settingsCustomKey,
+          custom_model: this.settingsCustomModel,
+          ignore_patterns: this.settingsIgnorePatterns,
+        }),
+      });
+      this.settingsSaved = true;
+      setTimeout(() => this.settingsSaved = false, 2000);
     },
   };
 }

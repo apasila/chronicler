@@ -49,8 +49,41 @@ class OllamaConfig:
 
 
 @dataclass
+class CustomProviderConfig:
+    enabled: bool = False
+    base_url: str = "http://localhost:8080/v1"
+    api_key: str = ""
+    model: str = "local-model"
+
+
+DEFAULT_IGNORE_PATTERNS: list[str] = [
+    "node_modules/**",
+    ".git/**",
+    "*.lock",
+    "*.log",
+    "dist/**",
+    "build/**",
+    ".env",
+    ".env.*",
+    "__pycache__/**",
+    ".DS_Store",
+    "*.pyc",
+    ".pytest_cache/**",
+    ".next/**",
+    "*.tsbuildinfo",
+    ".venv/**",
+    "venv/**",
+    ".mypy_cache/**",
+    "coverage/**",
+    ".coverage",
+    "*.min.js",
+    "*.min.css",
+]
+
+
+@dataclass
 class IgnoreConfig:
-    patterns: list[str] = field(default_factory=list)
+    patterns: list[str] = field(default_factory=lambda: list(DEFAULT_IGNORE_PATTERNS))
 
 
 @dataclass
@@ -73,6 +106,7 @@ class Config:
     models: ModelsConfig = field(default_factory=ModelsConfig)
     groq: GroqConfig = field(default_factory=GroqConfig)
     ollama: OllamaConfig = field(default_factory=OllamaConfig)
+    custom: CustomProviderConfig = field(default_factory=CustomProviderConfig)
     ignore: IgnoreConfig = field(default_factory=IgnoreConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     project: ProjectConfig = field(default_factory=ProjectConfig)
@@ -92,9 +126,17 @@ def _dict_to_config(d: dict) -> Config:
     if ollama := d.get("ollama"):
         cfg.ollama = OllamaConfig(**{k: v for k, v in ollama.items()
                                      if k in OllamaConfig.__dataclass_fields__})
+    if custom := d.get("custom"):
+        cfg.custom = CustomProviderConfig(**{k: v for k, v in custom.items()
+                                             if k in CustomProviderConfig.__dataclass_fields__})
     if ignore := d.get("ignore"):
-        patterns = ignore.get("global_patterns", ignore.get("patterns", []))
-        cfg.ignore = IgnoreConfig(patterns=patterns)
+        user_patterns = ignore.get("global_patterns", ignore.get("patterns", []))
+        # Merge user patterns with defaults (user patterns take precedence, no duplicates)
+        merged = list(DEFAULT_IGNORE_PATTERNS)
+        for p in user_patterns:
+            if p not in merged:
+                merged.append(p)
+        cfg.ignore = IgnoreConfig(patterns=merged)
     if storage := d.get("storage"):
         cfg.storage = StorageConfig(**{k: v for k, v in storage.items()
                                        if k in StorageConfig.__dataclass_fields__})
@@ -129,5 +171,8 @@ def load_config(project_path: str, global_config_dir: str | None = None) -> Conf
 
     if api_key := os.environ.get("GROQ_API_KEY"):
         config.groq.api_key = api_key
+
+    if config.custom.enabled and config.custom.api_key:
+        os.environ["OPENAI_API_KEY"] = config.custom.api_key
 
     return config
