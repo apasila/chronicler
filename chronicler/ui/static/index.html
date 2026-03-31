@@ -252,7 +252,7 @@
             <div>
               <span class="font-semibold" style="font-size:20px;line-height:1"
                     :style="project.status === 'running' ? 'color:var(--green)' : 'color:var(--muted)'"
-                    x-text="(projectChangesToday[project.id] || 0)"></span>
+                    x-text="(project.today_changes || 0)"></span>
               <span class="ml-1 text-xs" style="color:var(--muted-fg)">today</span>
             </div>
             <div style="color:var(--border)">·</div>
@@ -878,7 +878,6 @@
 function chroniclerApp() {
   return {
     projects: [],
-    projectChangesToday: {},
     selectedProjectId: null,
     activeTab: 'activity',
     usageData: null,
@@ -942,7 +941,6 @@ function chroniclerApp() {
         this.checkGroqKey();
       }
       await this.loadActivity();
-      await this.loadChangesToday();
       await this.loadLog();
       this.connectSSE();
     },
@@ -1050,14 +1048,6 @@ function chroniclerApp() {
       this.activityEntries = await res.json();
     },
 
-    async loadChangesToday() {
-      const today = new Date().toISOString().slice(0, 10);
-      for (const project of this.projects) {
-        const res = await fetch(`/api/activity?project_id=${project.id}&limit=200`);
-        const entries = await res.json();
-        this.projectChangesToday[project.id] = entries.filter(e => e.timestamp.startsWith(today)).length;
-      }
-    },
 
     async loadUsage() {
       const res = await fetch('/api/usage');
@@ -1096,13 +1086,14 @@ function chroniclerApp() {
           this.activityEntries.unshift(entry);
           if (this.activityEntries.length > 100) this.activityEntries.pop();
         }
-        const today = new Date().toISOString().slice(0, 10);
-        if (entry.timestamp.startsWith(today)) {
-          this.projectChangesToday[entry.project_id] = (this.projectChangesToday[entry.project_id] || 0) + 1;
-        }
-        // Update total count
         const proj = this.projects.find(p => p.id === entry.project_id);
-        if (proj) proj.total_changes = (proj.total_changes || 0) + 1;
+        if (proj) {
+          proj.total_changes = (proj.total_changes || 0) + 1;
+          const today = new Date().toISOString().slice(0, 10);
+          if (entry.timestamp.startsWith(today)) {
+            proj.today_changes = (proj.today_changes || 0) + 1;
+          }
+        }
         setTimeout(() => { entry._new = false; }, 3000);
       };
       source.onerror = () => { setTimeout(() => this.connectSSE(), 5000); };

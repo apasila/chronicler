@@ -63,9 +63,12 @@ def create_app(db: Database | None = None) -> FastAPI:
         result = []
         for row in rows:
             project_path = Path(row["path"])
-            total = conn.execute(
-                "SELECT COUNT(*) FROM log_entries WHERE project_id = ?", (row["id"],)
-            ).fetchone()[0]
+            counts = conn.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN date(timestamp) = date('now') THEN 1 ELSE 0 END) as today
+                FROM log_entries WHERE project_id = ?
+            """, (row["id"],)).fetchone()
             result.append({
                 "id": row["id"],
                 "name": row["name"],
@@ -73,7 +76,8 @@ def create_app(db: Database | None = None) -> FastAPI:
                 "framework": row["framework"] or "",
                 "log_mode": row["log_mode"],
                 "status": get_daemon_status(project_path),
-                "total_changes": total,
+                "total_changes": counts["total"],
+                "today_changes": counts["today"] or 0,
             })
         return JSONResponse(result)
 
