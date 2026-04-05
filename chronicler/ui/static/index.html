@@ -274,12 +274,12 @@
             </button>
             <button
               @click.stop="generateStack(project.id)"
-              :disabled="stackGenerating"
+              :disabled="stackGenerating && selectedProject && selectedProject.id === project.id"
               class="btn btn-ghost btn-sm justify-center"
               style="flex:1"
               title="Generate or update the tech stack sheet for this project">
-              <span x-show="!stackGenerating">⬡ Stack</span>
-              <span x-show="stackGenerating">...</span>
+              <span x-show="!(stackGenerating && selectedProject && selectedProject.id === project.id)">⬡ Stack</span>
+              <span x-show="stackGenerating && selectedProject && selectedProject.id === project.id">...</span>
             </button>
             <button @click.stop="removeProject(project)" class="btn btn-ghost btn-sm"
                     style="padding:3px 7px;color:var(--muted-fg)"
@@ -287,9 +287,7 @@
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </button>
           </div>
-          <span x-show="stackLastGenerated && selectedProjectId === project.id" class="text-xs text-stone-500 mt-1"
-            x-text="stackIsStale ? '⚠ Stack may be stale' : ''">
-          </span>
+          <span x-show="stackIsStale" class="text-xs text-stone-500">⚠ Stack may be stale</span>
         </div>
       </template>
     </div>
@@ -1054,6 +1052,7 @@ function chroniclerApp() {
       this.stackGenerating = true;
       try {
         const res = await fetch(`/api/projects/${projectId}/stack/generate`, { method: 'POST' });
+        if (!res.ok) throw new Error(`Stack generation failed: ${res.status}`);
         const data = await res.json();
         this.stackLastGenerated = data.generated_at;
         this.stackIsStale = false;
@@ -1069,7 +1068,10 @@ function chroniclerApp() {
         const data = await res.json();
         this.stackLastGenerated = data.generated_at || null;
         this.stackIsStale = data.is_stale || false;
-      } catch (e) {}
+      } catch (e) {
+          this.stackLastGenerated = null;
+          this.stackIsStale = false;
+      }
     },
 
     async generateHandoffAll() {
