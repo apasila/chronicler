@@ -19,6 +19,13 @@ from chronicler.stack import run_stack_pipeline
 from chronicler.stack.renderer import load_stack_json
 from chronicler.stack.staleness import check_staleness
 
+_STACK_MANIFEST_NAMES = {
+    "package.json", "pyproject.toml", "requirements.txt",
+    "Cargo.toml", "go.mod", "tsconfig.json",
+    "tailwind.config.js", "tailwind.config.ts", "tailwind.config.mjs",
+    ".env.example",
+}
+
 app = typer.Typer(
     name="chronicler",
     help="Chronicler — automatic code change logging for AI agents",
@@ -383,15 +390,8 @@ def _run_watcher(project, config, db) -> None:
                     map_mgr.update(updates)
 
             # Trigger stack sheet regeneration on manifest file changes
-            _STACK_MANIFEST_NAMES = {
-                "package.json", "pyproject.toml", "requirements.txt",
-                "Cargo.toml", "go.mod", "tsconfig.json",
-                "tailwind.config.js", "tailwind.config.ts", "tailwind.config.mjs",
-                ".env.example",
-            }
             if fname in _STACK_MANIFEST_NAMES:
                 try:
-                    from chronicler.stack import run_stack_pipeline
                     run_stack_pipeline(
                         project_path=Path(project.path),
                         project_name=project.name,
