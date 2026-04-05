@@ -301,6 +301,7 @@
       <button @click="activeTab = 'activity'; loadActivity()" class="tab-btn" :class="activeTab === 'activity' ? 'active' : ''">Activity</button>
       <button @click="activeTab = 'log'; loadLog()" class="tab-btn" :class="activeTab === 'log' ? 'active' : ''">Full Log</button>
       <button @click="activeTab = 'usage'; loadUsage()" class="tab-btn" :class="activeTab === 'usage' ? 'active' : ''">Usage</button>
+      <button @click="activeTab = 'docs'" class="tab-btn" :class="activeTab === 'docs' ? 'active' : ''">Docs</button>
       <div class="flex-1"></div>
       <button @click="generateHandoffAll()" class="btn btn-gradient btn-sm"
               title="Generate a briefing document for all running projects — paste to your AI agent">
@@ -518,6 +519,76 @@
 
         </div>
       </template>
+    </div>
+
+    <!-- ── Docs Tab ────────────────────────────────────────────────────── -->
+    <div x-show="activeTab === 'docs'" class="flex-1 overflow-y-auto px-6 py-5">
+      <div class="space-y-6" style="max-width:760px">
+
+        <!-- Getting Started -->
+        <div class="rounded-xl p-5" style="background:var(--surface);border:1px solid var(--border)">
+          <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">Getting Started</h3>
+          <ol class="space-y-2" style="padding-left:1.25rem;list-style:decimal;color:var(--fg)">
+            <li class="text-sm">Add a project — click <strong>+ Add Project</strong> and select your project folder</li>
+            <li class="text-sm">Get an AI key — open <strong>Settings ⚙</strong> and paste a Groq API key (free at console.groq.com)</li>
+            <li class="text-sm">Watch it run — the green dot means Chronicler is watching. Save any file to see your first log entry appear</li>
+          </ol>
+        </div>
+
+        <!-- The Handoff -->
+        <div class="rounded-xl p-5" style="background:var(--surface);border:1px solid var(--border)">
+          <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">The Handoff</h3>
+          <p class="text-sm mb-3" style="color:var(--fg)">When you're ready to hand off to an AI coding agent, click <strong>✦ Handoff</strong> on any project card. The AI reads your recent session history and generates a briefing document. Paste it at the start of any Claude, Cursor, or Copilot session.</p>
+          <ul class="space-y-1.5" style="padding-left:1.25rem;list-style:disc;color:var(--muted-fg)">
+            <li class="text-sm">Generate after a productive session, not mid-task</li>
+            <li class="text-sm">The more changes logged, the richer the handoff</li>
+            <li class="text-sm">Use it with Cursor rules or Claude's CLAUDE.md for persistent context</li>
+          </ul>
+        </div>
+
+        <!-- Tech Stack Sheet -->
+        <div class="rounded-xl p-5" style="background:var(--surface);border:1px solid var(--border)">
+          <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">Tech Stack Sheet</h3>
+          <p class="text-sm mb-3" style="color:var(--fg)">Chronicler scans your project and generates <code class="font-mono text-xs px-1 rounded" style="background:var(--surface-2);color:var(--accent)">STACK.md</code> — a snapshot of every library, service, font, colour, and architectural decision. Coding agents read this to avoid introducing conflicting libraries or overriding decisions you've already made.</p>
+          <ul class="space-y-1.5" style="padding-left:1.25rem;list-style:disc;color:var(--muted-fg)">
+            <li class="text-sm">Click <strong style="color:var(--fg)">⬡ Stack</strong> to regenerate at any time</li>
+            <li class="text-sm">The sheet auto-updates when manifest files change (package.json, pyproject.toml, etc.)</li>
+            <li class="text-sm">Edit <code class="font-mono text-xs px-1 rounded" style="background:var(--surface-2);color:var(--accent)">.chronicler/tech-stack.json</code> to add constraints — rules that survive every regeneration (e.g. "Do not introduce a second state management library")</li>
+            <li class="text-sm">From the terminal: <code class="font-mono text-xs px-1 rounded" style="background:var(--surface-2);color:var(--accent)">chronicler stack regenerate</code></li>
+          </ul>
+        </div>
+
+        <!-- Activity Feed -->
+        <div class="rounded-xl p-5" style="background:var(--surface);border:1px solid var(--border)">
+          <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">Understanding the Activity Feed</h3>
+          <p class="text-sm mb-3" style="color:var(--fg)">Every file save triggers an AI analysis. Each log entry shows the change type, impact level (red/amber/green dot), file path, and a one-sentence summary. Click any entry to expand the diff.</p>
+          <div class="rounded-lg overflow-hidden" style="border:1px solid var(--border)">
+            <div class="grid text-xs font-semibold uppercase tracking-wider px-4 py-2" style="grid-template-columns:110px 1fr;background:var(--surface-2);color:var(--muted-fg)">
+              <span>Type</span><span>Meaning</span>
+            </div>
+            <div class="divide-y" style="border-top:1px solid var(--border)">
+              <div class="grid text-sm px-4 py-2" style="grid-template-columns:110px 1fr;color:var(--fg)"><code class="font-mono text-xs" style="color:var(--accent)">feature</code><span style="color:var(--muted-fg)">new functionality</span></div>
+              <div class="grid text-sm px-4 py-2" style="grid-template-columns:110px 1fr;border-top:1px solid var(--border-subtle);color:var(--fg)"><code class="font-mono text-xs" style="color:var(--accent)">bug fix</code><span style="color:var(--muted-fg)">fixing something broken</span></div>
+              <div class="grid text-sm px-4 py-2" style="grid-template-columns:110px 1fr;border-top:1px solid var(--border-subtle);color:var(--fg)"><code class="font-mono text-xs" style="color:var(--accent)">refactor</code><span style="color:var(--muted-fg)">restructuring without changing behaviour</span></div>
+              <div class="grid text-sm px-4 py-2" style="grid-template-columns:110px 1fr;border-top:1px solid var(--border-subtle);color:var(--fg)"><code class="font-mono text-xs" style="color:var(--accent)">config</code><span style="color:var(--muted-fg)">configuration and build changes</span></div>
+              <div class="grid text-sm px-4 py-2" style="grid-template-columns:110px 1fr;border-top:1px solid var(--border-subtle);color:var(--fg)"><code class="font-mono text-xs" style="color:var(--accent)">dependency</code><span style="color:var(--muted-fg)">packages added, removed, or updated</span></div>
+              <div class="grid text-sm px-4 py-2" style="grid-template-columns:110px 1fr;border-top:1px solid var(--border-subtle);color:var(--fg)"><code class="font-mono text-xs" style="color:var(--accent)">docs</code><span style="color:var(--muted-fg)">documentation changes</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLI Reference -->
+        <div class="rounded-xl p-5" style="background:var(--surface);border:1px solid var(--border)">
+          <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--muted-fg)">CLI Reference</h3>
+          <pre class="rounded-lg text-xs font-mono px-4 py-3 overflow-x-auto" style="background:var(--surface-2);color:var(--fg);line-height:1.75">chronicler ui                    <span style="color:var(--muted-fg)"># open dashboard</span>
+chronicler start                 <span style="color:var(--muted-fg)"># start watching in background</span>
+chronicler stop                  <span style="color:var(--muted-fg)"># stop watching</span>
+chronicler handoff               <span style="color:var(--muted-fg)"># generate handoff in terminal</span>
+chronicler stack regenerate      <span style="color:var(--muted-fg)"># regenerate tech stack sheet</span>
+chronicler log                   <span style="color:var(--muted-fg)"># browse change log</span></pre>
+        </div>
+
+      </div>
     </div>
 
   </main>
