@@ -15,6 +15,9 @@ from chronicler.core.daemon import start_daemon, stop_daemon, get_daemon_status
 from chronicler.storage.db import Database
 from chronicler.storage.map import MapManager
 from chronicler.storage.schema import Project
+from chronicler.stack import run_stack_pipeline
+from chronicler.stack.renderer import load_stack_json
+from chronicler.stack.staleness import check_staleness
 
 app = typer.Typer(
     name="chronicler",
@@ -22,6 +25,55 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+stack_app = typer.Typer(name="stack", help="Tech stack sheet commands")
+app.add_typer(stack_app)
+
+
+@stack_app.command("regenerate")
+def stack_regenerate(
+    path: str = typer.Option(".", help="Project path"),
+):
+    """Regenerate the tech stack sheet for a project."""
+    project_path = Path(path).resolve()
+    if not project_path.exists():
+        console.print(f"[red]Path does not exist: {project_path}[/red]")
+        raise typer.Exit(1)
+
+    db = _get_db()
+    project = db.get_project_by_path(str(project_path))
+    if project is None:
+        console.print("[red]Project not registered with Chronicler. Run `chronicler init` first.[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"Generating stack sheet for [bold]{project.name}[/bold]...")
+    try:
+        config = load_config(str(project_path))
+        run_stack_pipeline(
+            project_path=project_path,
+            project_name=project.name,
+            framework=project.framework,
+            config=config,
+        )
+    except Exception as e:
+        console.print(f"[red]Stack generation failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    stack = load_stack_json(project_path)
+    if stack:
+        staleness = check_staleness(stack, project_path)
+        table = Table(title="Tech Stack Sheet")
+        table.add_column("Key", style="cyan")
+        table.add_column("Category")
+        table.add_column("Value")
+        table.add_column("Source")
+        for entry in sorted(stack.entries, key=lambda e: (e.category, e.key)):
+            table.add_row(entry.key, entry.category, entry.value, entry.source)
+        console.print(table)
+        console.print(f"\n[green]✓ Stack sheet saved to {project_path}/STACK.md[/green]")
+        if staleness.is_stale:
+            for reason in staleness.reasons:
+                console.print(f"[yellow]⚠ {reason}[/yellow]")
 
 
 def _get_db() -> Database:
@@ -321,11 +373,34 @@ def _run_watcher(project, config, db) -> None:
             )
             # Trigger map update if file matches MAP_TRIGGER_PATTERNS
             fname = Path(file_path).name
-            if any(_fnmatch.fnmatch(fname, p) or _fnmatch.fnmatch(diff.relative_path, p)
-                   for p in MAP_TRIGGER_PATTERNS):
+            is_manifest = any(
+                _fnmatch.fnmatch(fname, p) or _fnmatch.fnmatch(diff.relative_path, p)
+                for p in MAP_TRIGGER_PATTERNS
+            )
+            if is_manifest:
                 updates = map_updater.update(map_mgr.read(), [entry])
                 if any(v for v in updates.values() if v):
                     map_mgr.update(updates)
+
+            # Trigger stack sheet regeneration on manifest file changes
+            _STACK_MANIFEST_NAMES = {
+                "package.json", "pyproject.toml", "requirements.txt",
+                "Cargo.toml", "go.mod", "tsconfig.json",
+                "tailwind.config.js", "tailwind.config.ts", "tailwind.config.mjs",
+                ".env.example",
+            }
+            if fname in _STACK_MANIFEST_NAMES:
+                try:
+                    from chronicler.stack import run_stack_pipeline
+                    run_stack_pipeline(
+                        project_path=Path(project.path),
+                        project_name=project.name,
+                        framework=project.framework,
+                        config=config,
+                    )
+                    console.print(f"[dim]  → stack sheet updated[/dim]")
+                except Exception as stack_err:
+                    console.print(f"[yellow]  → stack update failed: {stack_err}[/yellow]")
         except Exception as e:
             console.print(f"[red]Error processing {file_path}: {e}[/red]")
 
