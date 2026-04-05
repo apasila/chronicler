@@ -235,7 +235,7 @@
       <template x-for="project in projects" :key="project.id">
         <div class="card p-3 cursor-pointer"
              :class="selectedProjectId === project.id ? 'active' : ''"
-             @click="selectedProjectId = project.id; activeTab = 'activity'; loadActivity()">
+             @click="selectedProjectId = project.id; activeTab = 'activity'; loadActivity(); loadStackStatus(project.id)">
           <!-- Name row -->
           <div class="flex items-center mb-2" style="gap:10px">
             <div class="dot"
@@ -272,12 +272,24 @@
                     title="Generate a briefing so your AI agent can pick up where you left off">
               ✦ Handoff
             </button>
+            <button
+              @click.stop="generateStack(project.id)"
+              :disabled="stackGenerating"
+              class="btn btn-ghost btn-sm justify-center"
+              style="flex:1"
+              title="Generate or update the tech stack sheet for this project">
+              <span x-show="!stackGenerating">⬡ Stack</span>
+              <span x-show="stackGenerating">...</span>
+            </button>
             <button @click.stop="removeProject(project)" class="btn btn-ghost btn-sm"
                     style="padding:3px 7px;color:var(--muted-fg)"
                     title="Remove this project from Chronicler">
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </button>
           </div>
+          <span x-show="stackLastGenerated && selectedProjectId === project.id" class="text-xs text-stone-500 mt-1"
+            x-text="stackIsStale ? '⚠ Stack may be stale' : ''">
+          </span>
         </div>
       </template>
     </div>
@@ -923,6 +935,9 @@ function chroniclerApp() {
     settingsNewPattern: '',
     settingsHandoffInbox: '',
     settingsSaved: false,
+    stackGenerating: false,
+    stackLastGenerated: null,
+    stackIsStale: false,
 
     hints: [
       'Click the coloured dot to start or stop watching a project',
@@ -1033,6 +1048,28 @@ function chroniclerApp() {
           setTimeout(() => { this.handoffCopied = false; }, 3000);
         }).catch(() => {});
       }
+    },
+
+    async generateStack(projectId) {
+      this.stackGenerating = true;
+      try {
+        const res = await fetch(`/api/projects/${projectId}/stack/generate`, { method: 'POST' });
+        const data = await res.json();
+        this.stackLastGenerated = data.generated_at;
+        this.stackIsStale = false;
+      } catch (e) {
+        console.error('Stack generation failed', e);
+      } finally {
+        this.stackGenerating = false;
+      }
+    },
+    async loadStackStatus(projectId) {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/stack`);
+        const data = await res.json();
+        this.stackLastGenerated = data.generated_at || null;
+        this.stackIsStale = data.is_stale || false;
+      } catch (e) {}
     },
 
     async generateHandoffAll() {
