@@ -7,7 +7,7 @@ from pathlib import Path
 
 import toml
 
-from chronicler.stack.schema import StackEntry, TechStack, STACK_CATEGORIES
+from chronicler.stack.schema import StackEntry, TechStack
 
 _SERVICE_PATTERNS = {
     "stripe": "stripe", "sendgrid": "sendgrid", "twilio": "twilio",
@@ -126,6 +126,9 @@ def _parse_cargo(path: Path) -> list[StackEntry]:
 
 
 def _parse_go_mod(path: Path) -> list[StackEntry]:
+    # Handles single-line `require module version` and indented module/version pairs.
+    # Note: does not parse parenthesized `require ( ... )` blocks by keyword;
+    # relies on the fallback branch matching `path/module version` patterns instead.
     entries: list[StackEntry] = []
     for line in path.read_text().splitlines():
         line = line.strip()
