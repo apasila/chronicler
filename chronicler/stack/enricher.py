@@ -9,7 +9,7 @@ from chronicler.llm.prompts import (
     SYSTEM_PROMPT_STACK_ENRICHER,
     USER_PROMPT_STACK_ENRICHER,
 )
-from chronicler.stack.schema import StackEntry, TechStack
+from chronicler.stack.schema import STACK_CATEGORIES, StackEntry, TechStack
 
 _SOURCE_EXTENSIONS = {
     ".ts", ".tsx", ".js", ".jsx", ".mjs",
@@ -111,14 +111,16 @@ def enrich_stack(
         key = str(item.get("key", "")).strip()
         category = str(item.get("category", "library")).strip()
         value = str(item.get("value", "active")).strip()
-        confidence = float(item.get("confidence", 0.7))
+        try:
+            confidence = float(item.get("confidence") or 0.7)
+        except (TypeError, ValueError):
+            confidence = 0.7
         reason = str(item.get("reason", "")).strip() or None
 
         if not key or key in existing_keys:
             continue
 
         # Skip entries with invalid categories — don't let bad LLM output break the schema
-        from chronicler.stack.schema import STACK_CATEGORIES
         if category not in STACK_CATEGORIES:
             continue
 
