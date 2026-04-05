@@ -21,6 +21,7 @@ Chronicler is a background tool that silently watches your code projects while y
 - [Quick Start — 3 Steps](#quick-start--3-steps)
 - [The Dashboard](#the-dashboard)
 - [The Handoff — The Main Event](#the-handoff--the-main-event)
+- [Tech Stack Sheet](#tech-stack-sheet)
 - [Model Options](#model-options)
 - [Ignore Patterns — Filtering Out Noise](#ignore-patterns--filtering-out-noise)
 - [How the AI Understands Your Changes](#how-the-ai-understands-your-changes)
@@ -167,6 +168,7 @@ Each project card in the left sidebar shows:
 | **"832 changes today"** | Total logged changes today |
 | **Map** button | View an auto-generated overview of the project |
 | **✦ Handoff** button | Generate a briefing for an AI agent |
+| **⬡ Stack** button | Regenerate the tech stack sheet |
 | **×** button | Remove the project from Chronicler |
 
 **The dot is your on/off switch.** Click it once to pause watching, click again to resume.
@@ -248,6 +250,62 @@ The agent now has full context — what's done, what's in progress, what to avoi
 - **Generate after a productive session**, not in the middle of one
 - **The more real changes logged, the better** — make sure your ignore patterns filter out build artifacts (see below)
 - **Sessions matter** — the AI uses session boundaries to understand work blocks; the 30-minute gap is configurable
+
+---
+
+## Tech Stack Sheet
+
+Every AI agent that opens your project cold makes the same mistake: it doesn't know what libraries you're using, what services are wired up, or what architectural decisions you've already locked in. It might introduce a second state management library when you already have Zustand, or reach for a different icon set when you've standardised on Lucide.
+
+The tech stack sheet solves this. Chronicler scans each watched project and produces two files:
+
+- **`.chronicler/tech-stack.json`** — machine-readable source of truth, consumed by tools and scripts
+- **`STACK.md`** in your project root — human and agent-readable summary; paste it into any AI session or point your agent at it
+
+### What gets detected
+
+**Stage 1 — Static (instant, free):** Chronicler reads your manifest files directly — `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `tsconfig.json`, `tailwind.config.*`, `.env.example`, and CSS files. Libraries, versions, runtime targets, third-party services (inferred from env var names like `STRIPE_API_KEY`), colours, and fonts — all confidence `1.0`.
+
+**Stage 2 — LLM enrichment:** The AI scans up to 20 of your most import-heavy source files to find what's *actually used* (not just installed), identify icon packages, and surface any architectural patterns worth preserving as constraints.
+
+### Constraints — the most important part
+
+The `constraints` array in `tech-stack.json` is where you (or the AI) record decisions that must survive:
+
+```json
+"constraints": [
+  "Do not introduce a second state management library — Zustand is the only one",
+  "All colours must come from the palette defined below",
+  "Use Lucide for icons — do not add other icon packages"
+]
+```
+
+These are **human-authored** and survive every regeneration. They're rendered into `STACK.md` under a **Decisions & Constraints** heading — exactly where coding agents look.
+
+### How to use it
+
+Click **⬡ Stack** on any project card to regenerate. The sheet is also regenerated automatically whenever a manifest file changes (`package.json`, `pyproject.toml`, etc.).
+
+From the CLI:
+
+```bash
+# Regenerate the stack sheet for a project
+chronicler stack regenerate
+chronicler stack regenerate --path /path/to/project
+```
+
+To use it with an AI agent, either:
+- Reference `STACK.md` explicitly: *"Read STACK.md before suggesting any new libraries"*
+- Copy its contents into your session prompt
+- Point Cursor's rules file or Claude's CLAUDE.md at it
+
+### Staleness warnings
+
+If `package.json` changes but the sheet hasn't been regenerated, the UI shows a warning and `STACK.md` gets a header:
+
+```
+⚠️ Last verified: 2026-03-01. Some entries may be outdated — run `chronicler stack regenerate` or use the UI.
+```
 
 ---
 
@@ -490,6 +548,10 @@ chronicler handoff --sessions 10   # use last 10 sessions
 
 # View the project map
 chronicler map
+
+# Tech stack sheet
+chronicler stack regenerate            # regenerate for current directory
+chronicler stack regenerate --path /path/to/project
 ```
 
 ### Running in Foreground Mode
