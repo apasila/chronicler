@@ -17,6 +17,9 @@ from chronicler.storage.map import MapManager
 from chronicler.cli.main import _detect_framework
 from chronicler.config.settings import load_config
 from chronicler.llm.classifier import HandoffGenerator
+from chronicler.stack import run_stack_pipeline
+from chronicler.stack.renderer import load_stack_json
+from chronicler.stack.staleness import check_staleness
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -143,6 +146,18 @@ def create_app(db: Database | None = None) -> FastAPI:
             content = gitignore.read_text()
             if ".chronicler/" not in content:
                 gitignore.write_text(content + "\n.chronicler/\n")
+
+        # Generate initial stack sheet in background (non-fatal if it fails)
+        try:
+            config = load_config(str(project_path))
+            run_stack_pipeline(
+                project_path=project_path,
+                project_name=req.name,
+                framework=framework or None,
+                config=config,
+            )
+        except Exception:
+            pass  # stack sheet is optional — don't block project creation
 
         return {"id": project_id, "name": req.name, "path": str(project_path), "framework": framework}
 
@@ -318,6 +333,48 @@ def create_app(db: Database | None = None) -> FastAPI:
             inbox_dir.joinpath(f"{safe_name}-latest-handoff.md").write_text(output)
 
         return {"markdown": output, "saved_to": str(out_path)}
+
+    @app.get("/api/projects/{project_id}/stack")
+    def get_stack(project_id: str):
+        project = db.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project_path = Path(project.path)
+        stack = load_stack_json(project_path)
+        if stack is None:
+            return JSONResponse({"exists": False, "is_stale": False, "entries": [], "constraints": [], "reasons": []})
+        staleness = check_staleness(stack, project_path)
+        return JSONResponse({
+            "exists": True,
+            "generated_at": stack.generated_at.isoformat(),
+            "is_stale": staleness.is_stale,
+            "reasons": staleness.reasons,
+            "entries": [e.model_dump(mode="json") for e in stack.entries],
+            "constraints": stack.constraints,
+        })
+
+    @app.post("/api/projects/{project_id}/stack/generate")
+    def generate_stack(project_id: str):
+        project = db.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project_path = Path(project.path)
+        try:
+            config = load_config(str(project_path))
+            run_stack_pipeline(
+                project_path=project_path,
+                project_name=project.name,
+                framework=project.framework,
+                config=config,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Stack generation failed: {e}")
+        stack = load_stack_json(project_path)
+        return JSONResponse({
+            "status": "generated",
+            "generated_at": stack.generated_at.isoformat() if stack else None,
+            "entry_count": len(stack.entries) if stack else 0,
+        })
 
     @app.get("/api/config/groq-key-status")
     def groq_key_status():
