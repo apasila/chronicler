@@ -15,8 +15,11 @@ SESSION_HEALTH = ["productive", "exploratory", "debugging", "maintenance"]
 
 MAP_TRIGGER_PATTERNS = [
     "package.json", "requirements.txt", "go.mod", "Cargo.toml",
+    "pyproject.toml", "tsconfig.json",
+    "tailwind.config.js", "tailwind.config.ts", "tailwind.config.mjs",
+    ".env.example",
     "*.routes.*", "router.*", "app/api/**",
-    "*.config.*", ".env.example", "README*",
+    "*.config.*", "README*",
 ]
 
 
