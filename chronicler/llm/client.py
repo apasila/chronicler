@@ -10,6 +10,7 @@ def get_model_for_task(task: str, config: Config) -> str:
         "session_summarizer": config.models.workhorse,
         "map_updater":        config.models.workhorse,
         "handoff_generator":  config.models.premium,
+        "stack_enricher":     config.models.workhorse,
     }[task]
 
 

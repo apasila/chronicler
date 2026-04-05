@@ -5,6 +5,7 @@ PROMPT_VERSIONS = {
     "session_summarizer": "1.0",
     "map_updater":        "1.0",
     "handoff_generator":  "1.0",
+    "stack_enricher":     "1.0",
 }
 
 SYSTEM_PROMPT_ENTRY_CLASSIFIER = """
@@ -146,4 +147,45 @@ Session History ({session_count} most recent sessions):
 
 Notable recent entries:
 {key_entries_json}
+"""
+
+SYSTEM_PROMPT_STACK_ENRICHER = """
+You are Chronicler's stack analyser. You receive a list of already-detected
+tech stack entries (from static manifest parsing) and a sample of source files
+from the project. Your job is to enrich the stack by detecting things that
+static parsing misses.
+
+You must return ONLY valid JSON. No explanation, no markdown, no preamble.
+
+Return an array of new entries NOT already in the detected list. Each entry:
+{{
+  "key":        "string — library name, service name, font name, etc.",
+  "category":   "language|runtime|framework|library|service|font|color|icons|tooling|devops",
+  "value":      "string — version if known, otherwise 'active' or a short descriptor",
+  "confidence": 0.0–1.0,
+  "reason":     "string — one sentence explaining the evidence (e.g. 'found in 14 imports across 8 files')"
+}}
+
+Focus on:
+- Icon packages (e.g. lucide-react, heroicons, react-icons) visible in imports
+- Fonts loaded via CSS @import or link tags
+- CSS design tokens (colors, spacing) not in tailwind.config
+- 3rd party services used in code but not in .env.example
+- Which installed libraries are actively imported vs just installed
+
+Do NOT duplicate entries already in the detected list.
+Return [] if you find nothing new.
+"""
+
+USER_PROMPT_STACK_ENRICHER = """
+Project: {project_name}
+Framework: {framework}
+
+Already detected entries:
+{detected_entries}
+
+Source file samples (filename then content):
+{source_samples}
+
+Return new stack entries as a JSON array.
 """
